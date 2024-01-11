@@ -15,6 +15,7 @@ pub struct Game {
     pub match_list: BTreeMap<(u16, u16), Match>,
     queue: PriorityQueue<(u16, u16), i64>,
     rng_seed: usize,
+    rounds: usize,
 }
 
 fn get_quote(i: usize) -> (String, String) {
@@ -57,6 +58,7 @@ impl Game {
             match_list: BTreeMap::new(),
             queue: PriorityQueue::new(),
             rng_seed: rand::thread_rng().gen_range(0..100),
+            rounds: 1,
         }
     }
 
@@ -68,11 +70,38 @@ impl Game {
         self.player_list.get(&pid).unwrap().clone().to_owned()
     }
 
-    pub fn get_scores(&self) -> Vec<&Player> {
+    fn update_scores(&mut self) {
+        let keys = self.player_list.keys().map(|m| m.to_owned()).collect::<Vec<u16>>();
+        for p1 in keys {
+            let (played, score) = self.get_score_for_player(p1);
+
+            let player = self.player_list.get_mut(&p1).unwrap();
+            player.played = played;
+            player.score = score;
+        }
+    }
+    pub fn get_scores(&mut self) -> Vec<&Player> {
+        self.update_scores();
         let mut sorted_scores = self.player_list.values().collect::<Vec<_>>();
         sorted_scores.sort_by_key(|p1| Reverse(p1.score));
         sorted_scores
+    }
 
+    fn get_score_for_player(&self, pid: u16) -> (u16, u16) {
+        let matches = self.match_list.iter().filter(|((p1,p2), m)| {
+            ((p1 == &pid) | (p2 == &pid)) & (m.result.is_some())
+        }).collect::<Vec<_>>();
+        (matches.len() as u16, 
+            matches.iter().map(|(_,m)| m.get_score_for_player(pid)).sum()
+        )
+    }
+
+    pub fn set_rounds(&mut self, rounds: usize) {
+        self.rounds = rounds;
+    }
+
+    pub fn get_rounds(&mut self) -> usize {
+        self.rounds
     }
 
     pub fn get_next_games(&self, n: usize) -> Vec<&Match> {
@@ -86,19 +115,12 @@ impl Game {
     }
 
     pub fn get_next_game(&self) -> Option<&Match> {
-        if self.queue.iter().all(|(k,p)| p < &0) {
+        if self.queue.iter().all(|(_k,p)| p < &0) {
             None
         } else {
             let (i,_p) = self.queue.peek().unwrap();
             self.match_list.get(&i)
         }
-        //self.queue.clone().into_sorted_iter().filter_map(|(k, prior)| {
-        //    if prior > 0 {
-        //        Some(self.match_list.get(&k).unwrap())
-        //    } else {
-        //        None
-        //    }
-        //}).take(n).collect::<Vec<_>>().clone()
     }
 
     pub fn get_played_n(&self) -> usize {
@@ -164,6 +186,30 @@ impl Game {
         self.update_priorities();
     }
 
+    pub fn remove_latest(&mut self) {
+        info!("Remove latest play");
+        let mut played_games = self.get_played_games();
+        let (p1, p2) = if let Some((m,p)) = played_games.iter_mut().last() {
+            (m.player1, m.player2)
+        } else {
+
+            info!("No played games");
+            return;
+        };
+        self.remove_result((p1,p2));
+        info!("Removed latest play {} {}", p1, p2);
+        self.update_scores();
+        self.update_priorities();
+    }
+
+    pub fn remove_result(&mut self, game_id: (u16, u16)) {
+        let m = self.match_list.get_mut(&game_id).unwrap();
+        m.result = None;
+        m.play1 = None;
+        m.play2= None;
+        info!("Removed play {} {}", game_id.0, game_id.1);
+    }
+
     pub fn update_priorities(&mut self) {
         info!("Updating priorities");
         if self.player_list.is_empty() {
@@ -183,32 +229,34 @@ impl Game {
             };
             let player2 = self.player_list.get(&m.player2).unwrap();
             info!("\t{} - {}", player1.name, player2.name);
-            match self.queue.get(k) {
-                Some((_i,p)) if p < &0 => {
-                    info!("Game already has negative priority");
-                    continue;
-                },
-                _ => (),
-            }
 
             if m.play1.is_some() & m.play2.is_some() {
-                info!("\tSet negative priority");
-                self.queue.change_priority(k, -played_games);
-                continue;
+
+                match self.queue.get(k) {
+                    Some((_i,p)) if p < &0 => {
+                        info!("Game already has negative priority");
+                        continue;
+                    },
+                    _ => {
+                        info!("\tSet negative priority");
+                        self.queue.change_priority(k, -played_games);
+                        continue;
+                    },
+                }
             }
             let round = m.round;
             info!("\tRound = {}", &round);
             let games_left1 = n_games - player1.played;
             let games_left2 = n_games - player2.played;
             info!("\tGames left = {} / {}", &games_left1, &games_left2);
-            let potential1 = games_left1 * 9;
-            let potential2 = games_left2 * 9;
+            let potential1 = (games_left1 * 9) as i64;
+            let potential2 = (games_left2 * 9) as i64;
             info!("\tPotential = {} / {}", &potential1, &potential2);
-            let score1 = player1.score;
-            let score2 = player2.score;
+            let score1 = player1.score as i64;
+            let score2 = player2.score as i64;
             info!("\tScore = {} / {}", &score1, &score2);
-            let priority = potential1 + score1 + potential2 + score2 + round;
-            info!("\tPrioritye = {}", &priority);
+            let priority = score1 - potential1 + score2 - potential2;
+            info!("\tPriority = {}", &priority);
             self.queue.change_priority(k, (9999 - priority).into());
         }
         info!("priorities updated");
@@ -234,6 +282,32 @@ impl Match {
             play2: None,
             result: None,
             round,
+        }
+    }
+
+    pub fn get_score(&self) -> (u16, u16) {
+        if self.result.is_none() {
+            return (0,0);
+        }
+        let score = self.result.as_ref().unwrap().get_score();
+        let player1_score = self.play1.unwrap().get_score() + score;
+        let player2_score = self.play2.unwrap().get_score() + (6 - score);
+        (player1_score, player2_score)
+    }
+
+    fn get_score_for_player(&self, pid: u16) -> u16 {
+        if self.result.is_none() {
+            return 0;
+        }
+        if (pid != self.player1) & (pid != self.player2) {
+            0
+        } else {
+            let (p1_score, p2_score) = self.get_score();
+            if pid == self.player1 {
+                p1_score
+            } else {
+                p2_score
+            }
         }
     }
 }
