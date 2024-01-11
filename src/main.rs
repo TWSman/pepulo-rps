@@ -263,6 +263,7 @@ pub fn MatchList(
 game: ReadSignal<Game>,
 set_game: WriteSignal<Game>,
 ) -> impl IntoView {
+
     let data = move || game.get().get_played_games()
         .iter()
         .map(|(m,p)| {
@@ -306,7 +307,7 @@ set_game: WriteSignal<Game>,
             //</tr>
             <For
                 each=move || { data() }
-                key=|p| (p.name1.clone(), p.name2.clone())
+                key=|p| (p.name1.clone(), p.name2.clone(), p.round)
                 children=|child| {
                     view! {
                         <tr>
@@ -323,9 +324,11 @@ set_game: WriteSignal<Game>,
                     }
                 }
             />
-            <tr><td class="trashcan"
+            <tr>
+                <td class="trashcan"
             on:click = move |_| {set_game.update(|g| g.remove_latest())}
-            >"🗑️"</td></tr>
+            >"🗑️"</td>
+            </tr>
 
         </table>
         <h2>Seuraavana:</h2>
