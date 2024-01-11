@@ -51,10 +51,13 @@ pub fn NameInput(
         });
     };
     view! {
+        <div id="new_player">
         <form on:submit=on_submit>
-            <input type="text" value=name node_ref=input_element/>
+            <label for="newp">"Uusi pelaaja "</label>
+            <input type="text" id="newp" value=name node_ref=input_element/>
             <input type="submit" value="Lisää"/>
         </form>
+        </div>
     }
 }
 
@@ -100,7 +103,7 @@ fn Scores() -> impl IntoView {
     let (show_scoring, set_scoring) = create_signal(false);
     view! {
         <div class="nnn" id="scores" on:click=move |_| set_scoring.update(|value| *value = true)>
-            <Show when=move || { show_scoring.get() } fallback=|| view! { <h1>"Säännöt"</h1> }>
+            <Show when=move || { show_scoring.get() } fallback=|| view! { <h1>"Säännöt"</h1><h2>"(Onko Niitä)"</h2> }>
                 <p class="close" on:click=move |_| set_scoring.update(|value| *value = false)>
                     X
                 </p>
@@ -129,25 +132,27 @@ fn Scores() -> impl IntoView {
 }
 
 
+#[derive(Debug, Clone)]
+struct NextGame {
+    id1: u16,
+    id2: u16,
+    name1: String,
+    name2: String,
+}
+
 
 #[component]
 pub fn NextMatch(
     #[prop(into)]
-    game: WriteSignal<Game>,
-    player1: Player,
-    player2: Player,
+    game: ReadSignal<Game>,
+    set_game: WriteSignal<Game>,
 ) -> impl IntoView {
     //let (value, set_value) = create_signal("B".to_string());
     //
 
     let (value, set_value) = create_signal("None".to_string());
     let (value2, set_value2) = create_signal("None".to_string());
-    let player1_name = player1.name.to_string();
-    let player2_name = player2.name.to_string();
-
-    let player1_id = player1.id;
-    let player2_id = player2.id;
-
+        
     let on_submit = move |ev: SubmitEvent| {
         // Stop the page from reloading!
         ev.prevent_default();
@@ -158,52 +163,59 @@ pub fn NextMatch(
             info!("One option was None");
             return;
         }
+        let m = game.get().get_next_game().unwrap().clone();
+        let player1_id = m.player1;
+        let player2_id = m.player2;
         //let play1 = Rps::new(play1);
         let play1 = Rps::new(&play1[..]);
         let play2 = Rps::new(&play2[..]);
         let message = format!("Add result for {} {} v. {} {}", player1_id, play1, player2_id, play2).to_string();
         info!("{}", message);
-        game.update(|g| {
+        set_game.update(|g| {
             info!("message = {message}");
             g.add_result((player1_id,player2_id), play1, play2)}
         );
     };
-    view! {
-        <li>
-            <form on:submit=on_submit>
-                <p>
-                    {player1_name} "   " // <span class="play_select">"🪨"</span>
-                    // <span class="play_select">"📜"</span>
-                    // <span class="play_select">"✂️"</span>
 
-                    <select on:change=move |ev| {
-                        let new_value = event_target_value(&ev);
-                        set_value.set(new_value);
-                    }>
-                        <SelectOption value is="None"/>
-                        <SelectOption value is=Rps::Rock.str()/>
-                        <SelectOption value is=Rps::Paper.str()/>
-                        <SelectOption value is=Rps::Scissors.str()/>
-                    </select>
-                    " Vs. " {player2_name} "   "
-                    <select on:change=move |ev| {
-                        let new_value = event_target_value(&ev);
-                        set_value2.set(new_value);
-                    }>
-                        <SelectOption value=value2 is="None"/>
-                        <SelectOption value=value2 is=Rps::Rock.str()/>
-                        <SelectOption value=value2 is=Rps::Paper.str()/>
-                        <SelectOption value=value2 is=Rps::Scissors.str()/>
-                    </select>
-                </p>
-                <input type="submit" value="Lisää"/>
-            </form>
-        </li>
-        // <input type="text"
-        // value=name
-        // node_ref=input_element
-        ///>
-        "hei"
+    move || match game.get().get_next_game() {
+        Some(m) => {
+            let p1 = m.player1;
+            let p2 = m.player2;
+            let player1_name = game.get().get_player_name(p1);
+            let player2_name = game.get().get_player_name(p2);
+
+            view! {
+                <form on:submit=on_submit>
+                    <p>
+                        {player1_name} "   " // <span class="play_select">"🪨"</span>
+                        // <span class="play_select">"📜"</span>
+                        // <span class="play_select">"✂️"</span>
+                        <select on:change=move |ev| {
+                            let new_value = event_target_value(&ev);
+                            set_value.set(new_value);
+                        }>
+                            <SelectOption value is="None"/>
+                            <SelectOption value is=Rps::Rock.str()/>
+                            <SelectOption value is=Rps::Paper.str()/>
+                            <SelectOption value is=Rps::Scissors.str()/>
+                        </select>
+                        " Vs. " {player2_name} "   "
+                        <select on:change=move |ev| {
+                            let new_value = event_target_value(&ev);
+                            set_value2.set(new_value);
+                        }>
+                            <SelectOption value=value2 is="None"/>
+                            <SelectOption value=value2 is=Rps::Rock.str()/>
+                            <SelectOption value=value2 is=Rps::Paper.str()/>
+                            <SelectOption value=value2 is=Rps::Scissors.str()/>
+                        </select>
+                        <input type="submit" value="Lisää"/>
+                    </p>
+                </form>
+            }.into_view()
+
+        }
+        _ => view! {<p>"No More games"</p>}.into_view(),
     }
 }
 
@@ -222,6 +234,10 @@ struct GameScore {
     name2: String,
     play1: String,
     play2: String,
+    id1: u16,
+    id2: u16,
+    score1: u16,
+    score2: u16,
     prior: i64,
 }
 
@@ -234,31 +250,40 @@ set_game: WriteSignal<Game>,
         .iter()
         .map(|(m,p)| {
 
-            let p1 = m.player1;
-            let p2 = m.player2;
-            let player1 = game.get().get_player_name(p1);
-            let player2 = game.get().get_player_name(p2);
+            let id1 = m.player1;
+            let id2 = m.player2;
+            let player1 = game.get().get_player_name(id1);
+            let player2 = game.get().get_player_name(id2);
+            let (score1, score2) = m.get_score();
             let play1 = m.play1.unwrap().str().to_string();
             let play2 = m.play2.unwrap().str().to_string();
 
             GameScore {
                 name1: player1.clone(),
                 name2: player2.clone(),
-                play1: play1.clone(),
-                play2: play2.clone(),
+                play1,
+                play2,
+                id1,
+                id2,
+                score1,
+                score2,
                 prior: *p,
             }
         })
         .collect::<Vec<_>>();
 
-
     view! {
         <table>
             <tr>
-                <th>Prioriteetti</th>
+                <th>Prior</th>
+                <th></th>
+                <th></th>
                 <th>Pelaaja 1</th>
                 <th></th>
                 <th>Pelaaja 2</th>
+                <th></th>
+                <th></th>
+                <th></th>
             </tr>
             <For
                 each=move || { data() }
@@ -267,33 +292,26 @@ set_game: WriteSignal<Game>,
                     view! {
                         <tr>
                             <td>{child.prior}</td>
-                            <td>{child.name1} " - " {child.play1}</td>
+                            <td>{child.play1}</td>
+                            <td>{child.score1} "p"</td>
+                            <td style="text-align:right;">{child.name1} </td>
                             <td>"Vs."</td>
-                            <td>{child.name2} " - " {child.play2}</td>
+                            <td>{child.name2}</td>
+                            <td>{child.play2}</td>
+                            <td>{child.score2} "p"</td>
                         </tr>
                     }
                 }
             />
+            <tr><td class="trashcan"
+            on:click = move |_| {set_game.update(|g| g.remove_latest())}
+            >"🗑️"</td></tr>
 
         </table>
         <h2>Seuraavana</h2>
 
         <ul>
-            {game
-                .with(|data| {
-                    match data.get_next_game() {
-                        Some(m) => {
-                            let p1 = m.player1;
-                            let p2 = m.player2;
-                            let player1 = data.get_player(p1);
-                            let player2 = data.get_player(p2);
-                            view! { <NextMatch game=set_game player1=player1 player2=player2/> }
-                                .into_view()
-                        }
-                        None => view! { <p>"No more games"</p> }.into_view(),
-                    }
-                })}
-
+            <NextMatch game=game set_game=set_game/>
         </ul>
     }
 }
@@ -305,6 +323,7 @@ fn App() -> impl IntoView {
     //set_game.update(|g| {let _ = g.add_player("Bob");});
     //set_game.update(|g| {let _ = g.add_player("Charlie");});
     //set_game.update(|g| {let _ = g.add_player("Daniel");});
+    //set_game.update(|g| {let _ = g.add_player("Eric");});
     //set_game.update(|g| g.add_result((1,2), Rps::Rock, Rps::Scissors));
     //set_game.update(|g| g.add_result((3,4), Rps::Rock, Rps::Paper));
     let (show_names, set_names) = create_signal(false);
@@ -316,17 +335,17 @@ fn App() -> impl IntoView {
     };
 
     view! {
+        <div class="header" id="header">
+            <h1>"PePuLo KPS-Liiga"</h1>
+        </div>
         <div id="container">
-            <div class="header" id="header">
-                <h1>"PePuLo KPS Liiga"</h1>
-            </div>
             <Scores/>
             <div
                 class="nnn"
                 id="player_list"
                 on:click=move |_| set_names.update(|value| *value = true)
             >
-                <Show when=move || { show_names.get() } fallback=|| view! { <h1>"Pisteet"</h1> }>
+                <Show when=move || { show_names.get() } fallback=|| view! { <h1>"Pelaajat"</h1> }>
                     <p class="close" on:click=move |_| set_names.update(|value| *value = false)>
                         X
                     </p>
