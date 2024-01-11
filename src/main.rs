@@ -107,6 +107,7 @@ fn Scores() -> impl IntoView {
                 </p>
                 <ul>
                     <li>"KPS - kaikki vastaan kaikki"</li>
+                    <li>"Yksi peli kerrallaan"</li>
                     <li>"Kaksinkertainen sarja"</li>
                     <li>
                         "Pisteitä saa tuloksesta" <ul>
@@ -116,13 +117,15 @@ fn Scores() -> impl IntoView {
                         </ul>
                     </li>
                     <li>
-                        "ja pelatusta kädestä" <ul>
+                        "ja pelatusta kädestä (riippumatta tuloksesta)" <ul>
                             <li>" Sakset: 3 pistettä"</li>
                             <li>" Paperi: 2 pistettä"</li>
                             <li>" Kivi: 1 piste"</li>
                         </ul>
                     </li>
+                    <li>Eniten pisteitä kerännyt on voittaja</li>
                     <li>Tasapisteissä voittajan ratkaisee tavallinen, paras viidestä - kaksinkamppailu</li>
+                    <li>"Psyykkinen sodankäynti on sallittua"</li>
                 </ul>
             </Show>
         </div>
@@ -182,7 +185,7 @@ pub fn NextMatch(
 
             view! {
                 <form on:submit=on_submit>
-                    <p>"Round" {round}</p>
+                    // <p>"Round" {round}</p>
                     <p>
                         {player1_name} "   " // <span class="play_select">"🪨"</span>
                         // <span class="play_select">"📜"</span>
@@ -221,7 +224,7 @@ pub fn NextMatch(
                     }
             }.into_view()
         }
-        _ => view! {<p>"No More games"</p>}.into_view(),
+        _ => view! {<p>"-"</p>}.into_view(),
     }
 }
 
@@ -281,6 +284,12 @@ set_game: WriteSignal<Game>,
         })
         .collect::<Vec<_>>();
 
+    let quote = move || {
+        let (quote, author) = game.get().get_quote();
+        view! {<p>"\"" {quote} "\""</p><p>" - "{author}</p>}
+    };
+
+
     view! {
         <table>
             //<tr>
@@ -322,10 +331,12 @@ set_game: WriteSignal<Game>,
 
         </table>
         <h2>Seuraavana:</h2>
-
         <p>
             <NextMatch game=game set_game=set_game/>
         </p>
+
+        <hr/>
+        <div>{quote}</div>
     }
 }
 
@@ -343,17 +354,20 @@ fn App() -> impl IntoView {
     let (show_names, set_names) = create_signal(false);
     let (show_games, set_games) = create_signal(false);
 
-    let quote = move || {
-        let (quote, author) = game.get().get_quote();
-        view! {<p>"\"" {quote} "\""</p><p>" - "{author}</p>}
-    };
-
     view! {
         <div class="header" id="header">
             <h1>"PePuLo KPS-Liiga"</h1>
         </div>
         <div id="container">
             <Scores/>
+            <div class="nnn" id="games" on:click=move |_| set_games.update(|value| *value = true)>
+                <Show when=move || { show_games.get() } fallback=|| view! { <h1>"Pelaamaan"</h1> }>
+                    <p class="close" on:click=move |_| set_games.update(|value| *value = false)>
+                        X
+                    </p>
+                    <MatchList game=game set_game=set_game/>
+                </Show>
+            </div>
             <div
                 class="nnn"
                 id="player_list"
@@ -369,18 +383,9 @@ fn App() -> impl IntoView {
 
                 </Show>
             </div>
-            <div class="nnn" id="games" on:click=move |_| set_games.update(|value| *value = true)>
-                <Show when=move || { show_games.get() } fallback=|| view! { <h1>"Pelaamaan"</h1> }>
-                    <p class="close" on:click=move |_| set_games.update(|value| *value = false)>
-                        X
-                    </p>
-                    <MatchList game=game set_game=set_game/>
-                </Show>
-            </div>
-            <div class="nnn" id="quote">
-                {quote}
-
-            </div>
+            //<div class="nnn" id="quote">
+                //{quote}
+            //</div>
         </div>
     }
 }
