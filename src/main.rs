@@ -8,8 +8,6 @@ use log::debug;
 
 fn main() {
     _ = console_log::init_with_level(Level::Info);
-    //let game = Game::new();
-    //let app_state = Arc::new(Mutex::new(game));
     leptos::mount_to_body(|| view! { <App/> })
 }
 
@@ -292,18 +290,6 @@ set_game: WriteSignal<Game>,
 
     view! {
         <table>
-            //<tr>
-            //    //<th>Round</th>
-            //    //<th>Prior</th>
-            //    <th></th>
-            //    <th></th>
-            //    <th></th>
-            //    <th></th>
-            //    <th></th>
-            //    <th></th>
-            //    <th></th>
-            //    <th></th>
-            //</tr>
             <For
                 each=move || { data() }
                 key=|p| (p.name1.clone(), p.name2.clone(), p.round)
@@ -383,9 +369,6 @@ fn App() -> impl IntoView {
 
                 </Show>
             </div>
-            //<div class="nnn" id="quote">
-                //{quote}
-            //</div>
         </div>
     }
 }

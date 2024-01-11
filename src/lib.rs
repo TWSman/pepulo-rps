@@ -32,7 +32,6 @@ fn get_quote(i: usize) -> (String, String) {
         ("The will to conquer is the first condition of victory", "Ferdinand Foch"),
         ("The more difficult the victory, the greater the happiness in winning", "Pele"), //TODO!
         ("Preparedness is the key to success and victory", "Douglas MacArthur"),
-        // ("It’s always darkest before the dawn. The bigger your challenge, the closer you are to your victory.", "Joel Osteen"),
         ("So a military force has no constant formation, water has no constant shape: the ability to gain victory by changing and adapting according to the opponent is called genius.", "Sun Tzu"),
         ("Even the smallest victory is never to be taken for granted. Each victory must be applauded...", "Audre Lorde"),
         ("There is only one decisive victory: the last.","Carl von Clausewitz"),
