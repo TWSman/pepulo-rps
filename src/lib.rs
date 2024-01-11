@@ -4,12 +4,50 @@ use num_traits::FromPrimitive;
 use std::collections::BTreeMap;
 use priority_queue::PriorityQueue;
 use std::cmp::Reverse;
+use rand::Rng;
+use std::fmt::Display;
+use core::fmt;
+use log::info;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Game {
-    player_list: BTreeMap<u16, Player>,
-    match_list: BTreeMap<(u16, u16), Match>,
+    pub player_list: BTreeMap<u16, Player>,
+    pub match_list: BTreeMap<(u16, u16), Match>,
     queue: PriorityQueue<(u16, u16), i64>,
+    rng_seed: usize,
+}
+
+fn get_quote(i: usize) -> (String, String) {
+    let quotes: Vec<(&str, &str)> = vec![
+        ("Victory belongs to the most persevering.", "Napoleon Bonaparte"),
+        ("Your victory is right around the corner. Never give up.", "Nicky Minaj"),
+        ("War is a series of catastrophes which result in victory.", "Albert Pike"),
+        ("Know thy self, know thy enemy. A thousand battles, a thousand victories", "Sun Tzu"),
+        ("No victory without suffering", "J. R. R. Tolkien"),
+        ("Victory comes from finding opportunities in problems", "Sun Tzu"),
+        ("Without training, they lacked knowledge. Without knowledge, they lacked confidence. Without confidence, they lacked victory.", "Julius Ceasar"),
+        ("The will to conquer is the first condition of victory", "Ferdinand Foch"),
+        ("The more difficult the victory, the greater the happiness in winning", "Pele"), //TODO!
+        ("Preparedness is the key to success and victory", "Douglas MacArthur"),
+        // ("It’s always darkest before the dawn. The bigger your challenge, the closer you are to your victory.", "Joel Osteen"),
+        ("So a military force has no constant formation, water has no constant shape: the ability to gain victory by changing and adapting according to the opponent is called genius.", "Sun Tzu"),
+        ("Even the smallest victory is never to be taken for granted. Each victory must be applauded...", "Audre Lorde"),
+        ("There is only one decisive victory: the last.","Carl von Clausewitz"),
+        ("Victory is sweetest when you've known defeat.", "Malcolm Forbes"),
+        ("You ask what the aim is? I tell you it is victory - total victory.", "Winston Churchill "),
+        ("Forewarned, forearmed; to be prepared is half the victory.","Miguel de Cervantes"),
+        ("Full effort is full victory.","Mahatma Gandhi"),
+        ("If there exists no possibility of failure, then victory is meaningless.","Robert H. Schuller"),
+        ("We lost because we told ourselves we lost.","Leo Tolstoy"),
+        ("The secret of all victory lies in the organization of the non-obvious.", "Marcus Aurelius"),
+        ("I would challenge you to a battle of wits, but I see you are unarmed!","William Shakespeare"),
+        ("Sometimes by losing a battle you find a new way to win the war.","Donald Trump"),
+        ("All men can see these tactics whereby I conquer, but what none can see is the strategy out of which victory is evolved.","Sun Tzu"),
+        ("Our greatest glory is not in never falling, but in rising every time we fall.", "Confucius"),
+        ("Somebody's gotta win and somebody's gotta lose and I believe in letting the other guy lose.", "Pete Rose"),
+    ];
+    let q = quotes[i % quotes.len()];
+    (q.0.to_string(), q.1.to_string())
 }
 
 impl Game {
@@ -18,6 +56,7 @@ impl Game {
             player_list: BTreeMap::new(),
             match_list: BTreeMap::new(),
             queue: PriorityQueue::new(),
+            rng_seed: rand::thread_rng().gen_range(0..100),
         }
     }
 
@@ -46,70 +85,133 @@ impl Game {
         }).take(n).collect::<Vec<_>>().clone()
     }
 
-    pub fn get_played_games(&self) -> Vec<&Match> {
-        self.queue.iter().filter_map(|(k, prior)|  {
-            if prior < &0 {
-                Some(self.match_list.get(k).unwrap())
+    pub fn get_next_game(&self) -> Option<&Match> {
+        if self.queue.iter().all(|(k,p)| p < &0) {
+            None
+        } else {
+            let (i,_p) = self.queue.peek().unwrap();
+            self.match_list.get(&i)
+        }
+        //self.queue.clone().into_sorted_iter().filter_map(|(k, prior)| {
+        //    if prior > 0 {
+        //        Some(self.match_list.get(&k).unwrap())
+        //    } else {
+        //        None
+        //    }
+        //}).take(n).collect::<Vec<_>>().clone()
+    }
+
+    pub fn get_played_n(&self) -> usize {
+        self.queue.clone().into_sorted_iter().filter(|(_k, prior)|  {
+            prior < &0
+        }).count()
+    }
+
+    pub fn get_quote(&self) -> (String, String) {
+        let i = self.get_played_n();
+        get_quote(i + self.rng_seed)
+    }
+    pub fn get_played_games(&self) -> Vec<(&Match, i64)> {
+        self.queue.clone().into_sorted_iter().filter_map(|(k, prior)|  {
+            if prior < 0 {
+                Some((self.match_list.get(&k).unwrap(), prior))
             } else {
                 None
             }
-        }).collect::<Vec<&Match>>()
+        }).collect::<Vec<_>>()
     }
 
-    pub fn add_player(&mut self, name: &str) {
+    pub fn add_player(&mut self, name: &str) -> Result<(), String> {
+        if self.player_list.values().filter(|p| p.name == name).count() > 0 {
+            return Err("Player Already exists".to_string());
+        }
         let id = self.player_list.keys().max().unwrap_or(&0) + 1;
         let player: Player = Player::new(name, id);
+        let mut i = 0;
         for (id, p) in &self.player_list {
             if self.match_list.contains_key(&(p.id, player.id)) {
-                panic!("Match already exists");
+                return Err("Match Already exists".to_string());
             }
             self.match_list.insert(
-                (*id, player.id), Match::new(p, &player)
+                (*id, player.id), Match::new(p, &player, i)
             );
+            i += 1;
             self.queue.push((*id, player.id), 0);
         }
         self.player_list.insert(player.id, player);
         self.update_priorities();
+        Ok(())
     }
 
     pub fn add_result(&mut self, game_id: (u16, u16), play1: Rps, play2: Rps) {
+        info!("Adding result to game");
         let m = self.match_list.get_mut(&game_id).unwrap();
         let player1 = self.player_list.get_mut(&m.player1).unwrap();
-        let result = play1.result(&play2).get_score();
-        let player1_score = play1.get_score() + result;
-        let player2_score = play2.get_score() + (6 - result);
+        let result = play1.result(&play2);
+        let score = result.get_score();
+        let player1_score = play1.get_score() + score;
+        let player2_score = play2.get_score() + (6 - score);
         player1.played += 1;
         player1.score += player1_score;
+        info!("Player {} has played {} games with a total score {}", player1.name, &player1.played, &player1.score);
         m.play1 = Some(play1);
         m.play2 = Some(play2);
+        m.result = Some(result);
         let player2 = self.player_list.get_mut(&m.player2).unwrap();
         player2.played += 1;
         player2.score += player2_score;
+        info!("Player {} has played {} games with a total score {}", player2.name, &player2.played, &player2.score);
         self.update_priorities();
     }
 
     pub fn update_priorities(&mut self) {
+        info!("Updating priorities");
         if self.player_list.is_empty() {
+            info!("Player List is empty");
             return;
         }
-        let played_games = self.player_list.values().map(|p| p.played as i64).sum::<i64>() / 2;
+        let played_games = self.player_list.values().map(|p| p.played as i64).sum::<i64>() / 2 + 1;
         let n_games = (self.player_list.len() - 1) as u16;
         for (k, m) in &self.match_list {
+            info!("Priority for game {} - {}", k.0, k.1);
+            let player1 = match self.player_list.get(&m.player1) {
+                Some(p) => p,
+                None => {
+                    info!("Error getting {}", m.player1);
+                    panic!("");
+                }
+            };
+            let player2 = self.player_list.get(&m.player2).unwrap();
+            info!("\t{} - {}", player1.name, player2.name);
+            match self.queue.get(k) {
+                Some((_i,p)) if p < &0 => {
+                    info!("Game already has negative priority");
+                    continue;
+                },
+                _ => (),
+            }
+
             if m.play1.is_some() & m.play2.is_some() {
+                info!("\tSet negative priority");
                 self.queue.change_priority(k, -played_games);
                 continue;
             }
-            let player1 = self.player_list.get(&m.player1).unwrap();
-            let player2 = self.player_list.get(&m.player2).unwrap();
+            let round = m.round;
+            info!("\tRound = {}", &round);
             let games_left1 = n_games - player1.played;
             let games_left2 = n_games - player2.played;
+            info!("\tGames left = {} / {}", &games_left1, &games_left2);
             let potential1 = games_left1 * 9;
             let potential2 = games_left2 * 9;
+            info!("\tPotential = {} / {}", &potential1, &potential2);
             let score1 = player1.score;
             let score2 = player2.score;
-            let priority = potential1 - score1 + potential2 - score2;
-            self.queue.change_priority(k, priority.into());
+            info!("\tScore = {} / {}", &score1, &score2);
+            let priority = potential1 + score1 + potential2 + score2 + round;
+            info!("\tPrioritye = {}", &priority);
+            self.queue.change_priority(k, (9999 - priority).into());
         }
+        info!("priorities updated");
     }
 }
 
@@ -119,15 +221,19 @@ pub struct Match {
     pub player2: u16,
     pub play1: Option<Rps>,
     pub play2: Option<Rps>,
+    pub result: Option<RpsResult>,
+    round: u16,
 }
 
 impl Match {
-    fn new(player1: &Player, player2: &Player) -> Self {
+    fn new(player1: &Player, player2: &Player, round: u16) -> Self {
         Match {
             player1: player1.id,
             player2: player2.id,
             play1: None,
             play2: None,
+            result: None,
+            round,
         }
     }
 }
@@ -155,8 +261,8 @@ pub enum Rps {
     Scissors,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-enum RpsResult {
+#[derive(Hash, Eq, PartialEq, Debug, Clone)]
+pub enum RpsResult {
     Win,
     Lose,
     Draw,
@@ -173,6 +279,12 @@ impl RpsResult {
     }
 }
 
+impl Display for Rps {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.str())
+    }
+}
+
 #[allow(dead_code)]
 impl Rps {
     fn get_score(&self) -> u16 {
@@ -185,9 +297,19 @@ impl Rps {
 
     pub fn str(&self) -> &str {
         match self {
-            Rps::Rock => "Kivi 🪨",
-            Rps::Paper => "Paperi 📜",
-            Rps::Scissors => "Sakset ✂️",
+            Rps::Rock => "🪨",
+            Rps::Paper => "📜",
+            Rps::Scissors => "✂️",
+        }
+    }
+
+
+    pub fn new(inp: &str) -> Self {
+        match inp {
+            "🪨" => Self::Rock,
+            "📜" => Self::Paper,
+            "✂️" => Self::Scissors,
+            _ => panic!("Unknown string"),
         }
     }
 
@@ -231,14 +353,14 @@ mod tests {
     #[test]
     fn new_player_midgame() {
         let mut game = Game::new();
-        game.add_player("Alice");
-        game.add_player("Bob");
-        game.add_player("Charlie");
+        let _ = game.add_player("Alice");
+        let _ = game.add_player("Bob");
+        let _ = game.add_player("Charlie");
 
         game.add_result((1,2), Rps::Rock, Rps::Scissors);
         game.add_result((1,3), Rps::Rock, Rps::Paper);
 
-        game.add_player("David");
+        let _ = game.add_player("David");
         game.update_priorities();
         assert_eq!(game.player_list.len(), 4);
         assert_eq!(game.match_list.len(), 6);
