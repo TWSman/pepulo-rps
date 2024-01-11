@@ -1,7 +1,7 @@
 use leptos::{ev::SubmitEvent, *};
 use leptos::html::Input;
 use console_log;
-use Jan2024::{Game,Rps};
+use pepulo_rps::{Game,Rps};
 use log::Level;
 use log::info;
 use log::debug;
