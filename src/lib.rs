@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 use priority_queue::PriorityQueue;
 use std::cmp::Reverse;
 
+#[derive(Debug)]
 pub struct Game {
     player_list: BTreeMap<u16, Player>,
     match_list: BTreeMap<(u16, u16), Match>,
@@ -20,11 +21,29 @@ impl Game {
         }
     }
 
+    pub fn get_player_name(&self, pid: u16) -> String {
+        self.player_list.get(&pid).unwrap().name.clone()
+    }
+
+    pub fn get_player(&self, pid: u16) -> Player {
+        self.player_list.get(&pid).unwrap().clone().to_owned()
+    }
+
     pub fn get_scores(&self) -> Vec<&Player> {
         let mut sorted_scores = self.player_list.values().collect::<Vec<_>>();
         sorted_scores.sort_by_key(|p1| Reverse(p1.score));
         sorted_scores
 
+    }
+
+    pub fn get_next_games(&self, n: usize) -> Vec<&Match> {
+        self.queue.clone().into_sorted_iter().filter_map(|(k, prior)| {
+            if prior > 0 {
+                Some(self.match_list.get(&k).unwrap())
+            } else {
+                None
+            }
+        }).take(n).collect::<Vec<_>>().clone()
     }
 
     pub fn get_played_games(&self) -> Vec<&Match> {
@@ -95,11 +114,11 @@ impl Game {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-struct Match {
-    player1: u16, 
-    player2: u16,
-    play1: Option<Rps>,
-    play2: Option<Rps>,
+pub struct Match {
+    pub player1: u16, 
+    pub player2: u16,
+    pub play1: Option<Rps>,
+    pub play2: Option<Rps>,
 }
 
 impl Match {
@@ -113,12 +132,12 @@ impl Match {
     }
 }
 
-#[derive(Debug)]
-struct Player {
-    id: u16,
-    name: String,
-    score: u16,
-    played: u16,
+#[derive(Debug, Clone)]
+pub struct Player {
+    pub id: u16,
+    pub name: String,
+    pub score: u16,
+    pub played: u16,
 }
 
 #[allow(dead_code)]
@@ -130,7 +149,7 @@ impl Player {
 
 
 #[derive(Hash, Debug, Copy, Clone, PartialEq, Eq, FromPrimitive)]
-enum Rps {
+pub enum Rps {
     Rock,
     Paper,
     Scissors,
@@ -161,6 +180,14 @@ impl Rps {
             Rps::Rock => 1,
             Rps::Paper => 2,
             Rps::Scissors => 3,
+        }
+    }
+
+    pub fn str(&self) -> &str {
+        match self {
+            Rps::Rock => "Kivi 🪨",
+            Rps::Paper => "Paperi 📜",
+            Rps::Scissors => "Sakset ✂️",
         }
     }
 
