@@ -1,6 +1,5 @@
 use leptos::{ev::SubmitEvent, *};
 use leptos::html::Input;
-use console_log;
 use pepulo_rps::{Game,Rps};
 use log::Level;
 use log::info;
@@ -66,7 +65,7 @@ pub fn PlayerList(
     let data = move || game.get().get_scores()
         .iter()
         .map(|i| {
-            PlayerScore {name:i.name.clone(), played:i.played.clone(), score:i.score.clone()}
+            PlayerScore {name:i.name.clone(), played:i.played, score:i.score}
         })
         .collect::<Vec<_>>();
     view! {
@@ -179,7 +178,6 @@ pub fn NextMatch(
             let player1_name = game.get().get_player_name(p1);
             let player2_name = game.get().get_player_name(p2);
             let n_games = game.get().get_left_n();
-            let round = m.round;
 
             view! {
                 <form on:submit=on_submit>
@@ -235,6 +233,7 @@ pub fn SelectOption(is: &'static str, value: ReadSignal<String>) -> impl IntoVie
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 struct GameScore {
     name1: String,

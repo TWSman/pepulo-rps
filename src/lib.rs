@@ -10,16 +10,6 @@ use core::fmt;
 use log::info;
 use log::debug;
 
-#[derive(Debug, Clone)]
-pub struct Game {
-    pub player_list: BTreeMap<u16, Player>,
-    // keys are player1, player2, round
-    pub match_list: BTreeMap<(u16, u16, u16), Match>,
-    queue: PriorityQueue<(u16, u16, u16), i64>,
-    rng_seed: usize,
-    rounds: usize,
-}
-
 fn get_quote(i: usize) -> (String, String) {
     let quotes: Vec<(&str, &str)> = vec![
         ("Victory belongs to the most persevering.", "Napoleon Bonaparte"),
@@ -50,6 +40,24 @@ fn get_quote(i: usize) -> (String, String) {
     ];
     let q = quotes[i % quotes.len()];
     (q.0.to_string(), q.1.to_string())
+}
+
+
+#[derive(Debug, Clone)]
+pub struct Game {
+    pub player_list: BTreeMap<u16, Player>,
+    // keys are player1, player2, round
+    pub match_list: BTreeMap<(u16, u16, u16), Match>,
+    queue: PriorityQueue<(u16, u16, u16), i64>,
+    rng_seed: usize,
+    rounds: usize,
+}
+
+
+impl Default for Game {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Game {
@@ -103,17 +111,17 @@ impl Game {
         if rounds > old_rounds {
             let keys = self.player_list.keys().collect::<Vec<_>>();
             for player_id in keys {
-                let player = self.player_list.get(&player_id).unwrap();
+                let player = self.player_list.get(player_id).unwrap();
                 for (id, p) in &self.player_list {
                     if id <= player_id {
                         continue;
                     }
                     for round in (old_rounds+1)..=(self.rounds) {
-                        if self.match_list.contains_key(&(p.id, player_id.clone(), round as u16)){
+                        if self.match_list.contains_key(&(p.id, *player_id, round as u16)){
                             info!("Match Already exists");
                         }
                         self.match_list.insert(
-                            (*id, player_id.clone(), round as u16), Match::new(p, &player, round as u16)
+                            (*id, *player_id, round as u16), Match::new(p, player, round as u16)
                         );
                         self.queue.push((*id, player.id, round as u16), 0);
                     }
@@ -141,7 +149,7 @@ impl Game {
             None
         } else {
             let (i,_p) = self.queue.peek().unwrap();
-            self.match_list.get(&i)
+            self.match_list.get(i)
         }
     }
 
@@ -181,13 +189,13 @@ impl Game {
                     return Err("Match Already exists".to_string());
                 }
                 if round % 2 == 1 {
-                    let k = (id.clone(), player.id, round as u16);
+                    let k = (*id, player.id, round as u16);
                     self.match_list.insert(
                         k, Match::new(p, &player, round as u16)
                     );
                     self.queue.push(k, 0);
                 } else {
-                    let k = (player.id, id.clone(), round as u16);
+                    let k = (player.id, *id, round as u16);
                     self.match_list.insert(
                         k, Match::new(&player, p, round as u16)
                     );
@@ -299,7 +307,7 @@ impl Game {
             debug!("\tScore = {} / {}", &score1, &score2);
             let priority = score1 - potential1 + score2 - potential2 + (round as i64) * 1000;
             debug!("\tPriority = {}", &priority);
-            self.queue.change_priority(k, (99999 - priority).into());
+            self.queue.change_priority(k, 99999 - priority);
         }
         debug!("priorities updated");
     }
