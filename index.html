@@ -4,10 +4,19 @@
 
 .nnn {
 	border-style: solid;
+	margin: 10px;
+	padding: 10px;
 }
 
 .header {
 	border-style: solid;
+}
+
+#new_player {
+	margin-top: 3em;
+	border-style: dashed;
+	padding: 5px;
+	float: right;
 }
 
 .nnn:hover {
@@ -16,14 +25,22 @@
 }
 
 .close {
+	margin: 0;
+	padding: 0;
 	float: right;
 }
 .close:hover {
 	color: red;
 }
 
+.trashcan:hover {
+	border-color: red;
+	border-style: solid;
+}
+
 #container {
 	display: grid;
+	grid-template-columns: repeat(2, 1fr);
 }
 
 .play_select:hover {
