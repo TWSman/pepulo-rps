@@ -1,18 +1,15 @@
 use leptos::{ev::SubmitEvent, *};
 use leptos::html::Input;
 use console_log;
-use Jan2024::{Game,Rps, Player};
+use Jan2024::{Game,Rps};
 use log::Level;
 use log::info;
-
-// TODO: Reaktiivisuus
-// Pelien lisääminen bugaa
+use log::debug;
 
 fn main() {
-    _ = console_log::init_with_level(Level::Debug);
+    _ = console_log::init_with_level(Level::Info);
     //let game = Game::new();
     //let app_state = Arc::new(Mutex::new(game));
-    info!("It works!");
     leptos::mount_to_body(|| view! { <App/> })
 }
 
@@ -133,15 +130,6 @@ fn Scores() -> impl IntoView {
 }
 
 
-#[derive(Debug, Clone)]
-struct NextGame {
-    id1: u16,
-    id2: u16,
-    name1: String,
-    name2: String,
-}
-
-
 #[component]
 pub fn NextMatch(
     #[prop(into)]
@@ -174,9 +162,11 @@ pub fn NextMatch(
         let play1 = Rps::new(&play1[..]);
         let play2 = Rps::new(&play2[..]);
         let message = format!("Add result for {} {} v. {} {}", player1_id, play1, player2_id, play2).to_string();
-        info!("{}", message);
+        debug!("{}", message);
         set_game.update(|g| {
-            info!("message = {message}");
+            //spawn_local(async {
+            //    add_log("So much to do!".to_string()).await;
+            //});
             g.add_result((player1_id,player2_id, round), play1, play2)}
         );
     };
@@ -197,7 +187,7 @@ pub fn NextMatch(
                         {player1_name} "   " // <span class="play_select">"🪨"</span>
                         // <span class="play_select">"📜"</span>
                         // <span class="play_select">"✂️"</span>
-                        <select on:change=move |ev| {
+                        <select id="player1select" on:change=move |ev| {
                             let new_value = event_target_value(&ev);
                             set_value.set(new_value);
                         }>
@@ -207,7 +197,7 @@ pub fn NextMatch(
                             <SelectOption value is=Rps::Scissors.str()/>
                         </select>
                         " Vs. " {player2_name} "   "
-                        <select on:change=move |ev| {
+                        <select id="player2select" on:change=move |ev| {
                             let new_value = event_target_value(&ev);
                             set_value2.set(new_value);
                         }>

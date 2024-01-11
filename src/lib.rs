@@ -8,6 +8,7 @@ use rand::Rng;
 use std::fmt::Display;
 use core::fmt;
 use log::info;
+use log::debug;
 
 #[derive(Debug, Clone)]
 pub struct Game {
@@ -89,7 +90,7 @@ impl Game {
     }
 
     fn get_score_for_player(&self, pid: u16) -> (u16, u16) {
-        let matches = self.match_list.iter().filter(|((p1,p2,round), m)| {
+        let matches = self.match_list.iter().filter(|((p1,p2,_round), m)| {
             ((p1 == &pid) | (p2 == &pid)) & (m.result.is_some())
         }).collect::<Vec<_>>();
         (matches.len() as u16, 
@@ -201,30 +202,36 @@ impl Game {
     }
 
     pub fn add_result(&mut self, game_id: (u16, u16, u16), play1: Rps, play2: Rps) {
-        info!("Adding result to game");
+        debug!("Adding result to game {} {} {}", game_id.0, game_id.1, game_id.2);
         let m = self.match_list.get_mut(&game_id).unwrap();
         let player1 = self.player_list.get_mut(&m.player1).unwrap();
+        let name1 = player1.name.clone();
         let result = play1.result(&play2);
         let score = result.get_score();
         let player1_score = play1.get_score() + score;
         let player2_score = play2.get_score() + (6 - score);
+
         player1.played += 1;
         player1.score += player1_score;
-        info!("Player {} has played {} games with a total score {}", player1.name, &player1.played, &player1.score);
+        debug!("Player {} has played {} games with a total score {}", player1.name, &player1.played, &player1.score);
         m.play1 = Some(play1);
         m.play2 = Some(play2);
         m.result = Some(result);
         let player2 = self.player_list.get_mut(&m.player2).unwrap();
+        let name2 = player2.name.clone();
         player2.played += 1;
         player2.score += player2_score;
-        info!("Player {} has played {} games with a total score {}", player2.name, &player2.played, &player2.score);
+        debug!("Player {} has played {} games with a total score {}", player2.name, &player2.played, &player2.score);
+
+        info!("Add result for game {} - {} (round {}), {} ({} points) - {} ({} points)", name1, name2, m.round, play1, player1_score, play2, player2_score);
+
         self.update_priorities();
     }
 
     pub fn remove_latest(&mut self) {
         info!("Remove latest play");
         let mut played_games = self.get_played_games();
-        let (p1, p2, round) = if let Some((m,p)) = played_games.iter_mut().last() {
+        let (p1, p2, round) = if let Some((m,_p)) = played_games.iter_mut().last() {
             (m.player1, m.player2, m.round)
         } else {
 
@@ -246,7 +253,7 @@ impl Game {
     }
 
     pub fn update_priorities(&mut self) {
-        info!("Updating priorities");
+        debug!("Updating priorities");
         if self.player_list.is_empty() {
             info!("Player List is empty");
             return;
@@ -255,7 +262,7 @@ impl Game {
         let n_games = (self.rounds * (self.player_list.len() - 1)) as u16;
 
         for (k, m) in &self.match_list {
-            info!("Priority for game {} - {} (round {})", k.0, k.1, k.2);
+            debug!("Priority for game {} - {} (round {})", k.0, k.1, k.2);
             let player1 = match self.player_list.get(&m.player1) {
                 Some(p) => p,
                 None => {
@@ -264,38 +271,38 @@ impl Game {
                 }
             };
             let player2 = self.player_list.get(&m.player2).unwrap();
-            info!("\t{} - {}", player1.name, player2.name);
+            debug!("\t{} - {}", player1.name, player2.name);
 
             if m.play1.is_some() & m.play2.is_some() {
 
                 match self.queue.get(k) {
                     Some((_i,p)) if p < &0 => {
-                        info!("Game already has negative priority");
+                        debug!("Game already has negative priority");
                         continue;
                     },
                     _ => {
-                        info!("\tSet negative priority");
+                        debug!("\tSet negative priority");
                         self.queue.change_priority(k, -played_games);
                         continue;
                     },
                 }
             }
             let round = m.round;
-            info!("\tRound = {}", &round);
+            debug!("\tRound = {}", &round);
             let games_left1 = n_games - player1.played;
             let games_left2 = n_games - player2.played;
-            info!("\tGames left = {} / {}", &games_left1, &games_left2);
+            debug!("\tGames left = {} / {}", &games_left1, &games_left2);
             let potential1 = (games_left1 * 9) as i64;
             let potential2 = (games_left2 * 9) as i64;
-            info!("\tPotential = {} / {}", &potential1, &potential2);
+            debug!("\tPotential = {} / {}", &potential1, &potential2);
             let score1 = player1.score as i64;
             let score2 = player2.score as i64;
-            info!("\tScore = {} / {}", &score1, &score2);
+            debug!("\tScore = {} / {}", &score1, &score2);
             let priority = score1 - potential1 + score2 - potential2 + (round as i64) * 1000;
-            info!("\tPriority = {}", &priority);
+            debug!("\tPriority = {}", &priority);
             self.queue.change_priority(k, (99999 - priority).into());
         }
-        info!("priorities updated");
+        debug!("priorities updated");
     }
 }
 
