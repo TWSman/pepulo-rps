@@ -104,13 +104,13 @@ fn Scores() -> impl IntoView {
     let (show_scoring, set_scoring) = create_signal(false);
     view! {
         <div class="nnn" id="scores" on:click=move |_| set_scoring.update(|value| *value = true)>
-            <Show when=move || { show_scoring.get() } fallback=|| view! { <h1>"Säännöt"</h1><h2>"(Onko Niitä)"</h2> }>
+            <Show when=move || { show_scoring.get() } fallback=|| view! { <h1>"Säännöt"</h1>}>
                 <p class="close" on:click=move |_| set_scoring.update(|value| *value = false)>
                     X
                 </p>
                 <ul>
                     <li>"KPS - kaikki vastaan kaikki"</li>
-                    <li>"Yksinkertainen sarja"</li>
+                    <li>"Kaksinkertainen sarja"</li>
                     <li>
                         "Pisteitä saa tuloksesta" <ul>
                             <li>" Voitto: 6 pistettä"</li>
@@ -169,6 +169,7 @@ pub fn NextMatch(
         let m = game.get().get_next_game().unwrap().clone();
         let player1_id = m.player1;
         let player2_id = m.player2;
+        let round = m.round;
         //let play1 = Rps::new(play1);
         let play1 = Rps::new(&play1[..]);
         let play2 = Rps::new(&play2[..]);
@@ -176,7 +177,7 @@ pub fn NextMatch(
         info!("{}", message);
         set_game.update(|g| {
             info!("message = {message}");
-            g.add_result((player1_id,player2_id), play1, play2)}
+            g.add_result((player1_id,player2_id, round), play1, play2)}
         );
     };
 
@@ -186,9 +187,12 @@ pub fn NextMatch(
             let p2 = m.player2;
             let player1_name = game.get().get_player_name(p1);
             let player2_name = game.get().get_player_name(p2);
+            let n_games = game.get().get_left_n();
+            let round = m.round;
 
             view! {
                 <form on:submit=on_submit>
+                    <p>"Round" {round}</p>
                     <p>
                         {player1_name} "   " // <span class="play_select">"🪨"</span>
                         // <span class="play_select">"📜"</span>
@@ -215,8 +219,17 @@ pub fn NextMatch(
                         <input type="submit" value="Lisää"/>
                     </p>
                 </form>
+                    {if n_games > 1 {
+                        view! {
+                            <p>{n_games} " peliä jäljellä"</p>
+                        }
+                    } else {
+                            view! {
+                                <p>"1 peli jäljellä"</p>
+                            }
+                        }
+                    }
             }.into_view()
-
         }
         _ => view! {<p>"No More games"</p>}.into_view(),
     }
@@ -242,6 +255,7 @@ struct GameScore {
     score1: u16,
     score2: u16,
     prior: i64,
+    round: u16,
 }
 
 #[component]
@@ -271,30 +285,33 @@ set_game: WriteSignal<Game>,
                 score1,
                 score2,
                 prior: *p,
+                round: m.round,
             }
         })
         .collect::<Vec<_>>();
 
     view! {
         <table>
-            <tr>
-                <th>Prior</th>
-                <th></th>
-                <th></th>
-                <th>Pelaaja 1</th>
-                <th></th>
-                <th>Pelaaja 2</th>
-                <th></th>
-                <th></th>
-                <th></th>
-            </tr>
+            //<tr>
+            //    //<th>Round</th>
+            //    //<th>Prior</th>
+            //    <th></th>
+            //    <th></th>
+            //    <th></th>
+            //    <th></th>
+            //    <th></th>
+            //    <th></th>
+            //    <th></th>
+            //    <th></th>
+            //</tr>
             <For
                 each=move || { data() }
                 key=|p| (p.name1.clone(), p.name2.clone())
                 children=|child| {
                     view! {
                         <tr>
-                            <td>{child.prior}</td>
+                            //<td>{child.round}</td>
+                            //<td>{child.prior}</td>
                             <td>{child.play1}</td>
                             <td>{child.score1} "p"</td>
                             <td style="text-align:right;">{child.name1} </td>
@@ -311,24 +328,25 @@ set_game: WriteSignal<Game>,
             >"🗑️"</td></tr>
 
         </table>
-        <h2>Seuraavana</h2>
+        <h2>Seuraavana:</h2>
 
-        <ul>
+        <p>
             <NextMatch game=game set_game=set_game/>
-        </ul>
+        </p>
     }
 }
 
 #[component]
 fn App() -> impl IntoView {
     let (game, set_game) = create_signal(Game::new());
+    set_game.update(|g| g.set_rounds(2));
     //set_game.update(|g| {let _ = g.add_player("Alice");});
     //set_game.update(|g| {let _ = g.add_player("Bob");});
     //set_game.update(|g| {let _ = g.add_player("Charlie");});
     //set_game.update(|g| {let _ = g.add_player("Daniel");});
     //set_game.update(|g| {let _ = g.add_player("Eric");});
-    //set_game.update(|g| g.add_result((1,2), Rps::Rock, Rps::Scissors));
-    //set_game.update(|g| g.add_result((3,4), Rps::Rock, Rps::Paper));
+    //set_game.update(|g| g.add_result((1,2,1), Rps::Rock, Rps::Scissors));
+    //set_game.update(|g| g.add_result((3,4,1), Rps::Rock, Rps::Paper));
     let (show_names, set_names) = create_signal(false);
     let (show_games, set_games) = create_signal(false);
 

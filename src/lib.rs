@@ -12,8 +12,9 @@ use log::info;
 #[derive(Debug, Clone)]
 pub struct Game {
     pub player_list: BTreeMap<u16, Player>,
-    pub match_list: BTreeMap<(u16, u16), Match>,
-    queue: PriorityQueue<(u16, u16), i64>,
+    // keys are player1, player2, round
+    pub match_list: BTreeMap<(u16, u16, u16), Match>,
+    queue: PriorityQueue<(u16, u16, u16), i64>,
     rng_seed: usize,
     rounds: usize,
 }
@@ -88,7 +89,7 @@ impl Game {
     }
 
     fn get_score_for_player(&self, pid: u16) -> (u16, u16) {
-        let matches = self.match_list.iter().filter(|((p1,p2), m)| {
+        let matches = self.match_list.iter().filter(|((p1,p2,round), m)| {
             ((p1 == &pid) | (p2 == &pid)) & (m.result.is_some())
         }).collect::<Vec<_>>();
         (matches.len() as u16, 
@@ -97,7 +98,28 @@ impl Game {
     }
 
     pub fn set_rounds(&mut self, rounds: usize) {
+        let old_rounds = self.rounds;
         self.rounds = rounds;
+        if rounds > old_rounds {
+            let keys = self.player_list.keys().collect::<Vec<_>>();
+            for player_id in keys {
+                let player = self.player_list.get(&player_id).unwrap();
+                for (id, p) in &self.player_list {
+                    if id <= player_id {
+                        continue;
+                    }
+                    for round in (old_rounds+1)..=(self.rounds) {
+                        if self.match_list.contains_key(&(p.id, player_id.clone(), round as u16)){
+                            info!("Match Already exists");
+                        }
+                        self.match_list.insert(
+                            (*id, player_id.clone(), round as u16), Match::new(p, &player, round as u16)
+                        );
+                        self.queue.push((*id, player.id, round as u16), 0);
+                    }
+                }
+            }
+        }
     }
 
     pub fn get_rounds(&mut self) -> usize {
@@ -129,6 +151,10 @@ impl Game {
         }).count()
     }
 
+    pub fn get_left_n(&self) -> usize {
+        self.queue.len() - self.get_played_n()
+    }
+
     pub fn get_quote(&self) -> (String, String) {
         let i = self.get_played_n();
         get_quote(i + self.rng_seed)
@@ -149,23 +175,32 @@ impl Game {
         }
         let id = self.player_list.keys().max().unwrap_or(&0) + 1;
         let player: Player = Player::new(name, id);
-        let mut i = 0;
         for (id, p) in &self.player_list {
-            if self.match_list.contains_key(&(p.id, player.id)) {
-                return Err("Match Already exists".to_string());
+            for round in 1..=(self.rounds) {
+                if self.match_list.contains_key(&(p.id, player.id, round as u16)) {
+                    return Err("Match Already exists".to_string());
+                }
+                if round % 2 == 1 {
+                    let k = (id.clone(), player.id, round as u16);
+                    self.match_list.insert(
+                        k, Match::new(p, &player, round as u16)
+                    );
+                    self.queue.push(k, 0);
+                } else {
+                    let k = (player.id, id.clone(), round as u16);
+                    self.match_list.insert(
+                        k, Match::new(&player, p, round as u16)
+                    );
+                    self.queue.push(k, 0);
+                }
             }
-            self.match_list.insert(
-                (*id, player.id), Match::new(p, &player, i)
-            );
-            i += 1;
-            self.queue.push((*id, player.id), 0);
         }
         self.player_list.insert(player.id, player);
         self.update_priorities();
         Ok(())
     }
 
-    pub fn add_result(&mut self, game_id: (u16, u16), play1: Rps, play2: Rps) {
+    pub fn add_result(&mut self, game_id: (u16, u16, u16), play1: Rps, play2: Rps) {
         info!("Adding result to game");
         let m = self.match_list.get_mut(&game_id).unwrap();
         let player1 = self.player_list.get_mut(&m.player1).unwrap();
@@ -189,20 +224,20 @@ impl Game {
     pub fn remove_latest(&mut self) {
         info!("Remove latest play");
         let mut played_games = self.get_played_games();
-        let (p1, p2) = if let Some((m,p)) = played_games.iter_mut().last() {
-            (m.player1, m.player2)
+        let (p1, p2, round) = if let Some((m,p)) = played_games.iter_mut().last() {
+            (m.player1, m.player2, m.round)
         } else {
 
             info!("No played games");
             return;
         };
-        self.remove_result((p1,p2));
-        info!("Removed latest play {} {}", p1, p2);
+        self.remove_result((p1,p2, round ));
+        info!("Removed latest play {} {} {}", p1, p2, round);
         self.update_scores();
         self.update_priorities();
     }
 
-    pub fn remove_result(&mut self, game_id: (u16, u16)) {
+    pub fn remove_result(&mut self, game_id: (u16, u16, u16)) {
         let m = self.match_list.get_mut(&game_id).unwrap();
         m.result = None;
         m.play1 = None;
@@ -217,9 +252,10 @@ impl Game {
             return;
         }
         let played_games = self.player_list.values().map(|p| p.played as i64).sum::<i64>() / 2 + 1;
-        let n_games = (self.player_list.len() - 1) as u16;
+        let n_games = (self.rounds * (self.player_list.len() - 1)) as u16;
+
         for (k, m) in &self.match_list {
-            info!("Priority for game {} - {}", k.0, k.1);
+            info!("Priority for game {} - {} (round {})", k.0, k.1, k.2);
             let player1 = match self.player_list.get(&m.player1) {
                 Some(p) => p,
                 None => {
@@ -255,9 +291,9 @@ impl Game {
             let score1 = player1.score as i64;
             let score2 = player2.score as i64;
             info!("\tScore = {} / {}", &score1, &score2);
-            let priority = score1 - potential1 + score2 - potential2;
+            let priority = score1 - potential1 + score2 - potential2 + (round as i64) * 1000;
             info!("\tPriority = {}", &priority);
-            self.queue.change_priority(k, (9999 - priority).into());
+            self.queue.change_priority(k, (99999 - priority).into());
         }
         info!("priorities updated");
     }
@@ -270,7 +306,7 @@ pub struct Match {
     pub play1: Option<Rps>,
     pub play2: Option<Rps>,
     pub result: Option<RpsResult>,
-    round: u16,
+    pub round: u16,
 }
 
 impl Match {
@@ -431,8 +467,8 @@ mod tests {
         let _ = game.add_player("Bob");
         let _ = game.add_player("Charlie");
 
-        game.add_result((1,2), Rps::Rock, Rps::Scissors);
-        game.add_result((1,3), Rps::Rock, Rps::Paper);
+        game.add_result((1, 2, 1), Rps::Rock, Rps::Scissors);
+        game.add_result((1, 3, 1), Rps::Rock, Rps::Paper);
 
         let _ = game.add_player("David");
         game.update_priorities();
@@ -459,13 +495,25 @@ mod tests {
 
         dbg!(&game.queue);
         let (g3, p) = game.queue.pop().unwrap();
-        assert_eq!(g3, (2,4));
+        assert_eq!(g3, (2,4 ,1));
 
         let scores = game.get_scores();
         assert_eq!(scores[0].id, 1);
         assert_eq!(scores[1].id, 3);
         assert_eq!(scores[2].id, 2);
         assert_eq!(scores[3].id, 4);
+    }
+
+    #[test]
+    fn rounds() {
+        let mut game = Game::new();
+        game.add_player("Alice");
+        game.add_player("Bob");
+        game.add_player("Charlie");
+        assert_eq!(game.get_left_n(), 3);
+        game.set_rounds(2);
+        dbg!(&game.match_list);
+        assert_eq!(game.get_left_n(), 6);
     }
 
     #[test]
@@ -487,7 +535,7 @@ mod tests {
 
         //game.update_priorities();
 
-        game.add_result((1,2), Rps::Rock, Rps::Scissors);
+        game.add_result((1,2, 1), Rps::Rock, Rps::Scissors);
         let p1 = game.player_list.get(&1).unwrap();
         let p2 = game.player_list.get(&2).unwrap();
         assert_eq!(p1.score, 7);
@@ -498,25 +546,28 @@ mod tests {
         //game.update_priorities();
         dbg!(&game.queue);
         dbg!(&game.player_list);
-        let (g3, p) = game.queue.pop().unwrap();
+        let (g3, _p) = game.queue.pop().unwrap();
         // 2,3 should come first since player 1 has a higher score
         // Thus 1,3 has lower priority than 2,3 
-        assert_eq!(g3, (2,3));
-        let (g3, p) = game.queue.pop().unwrap();
-        assert_eq!(g3, (1,3));
+        assert_eq!(g3, (2, 3, 1));
+        let (g3, _p) = game.queue.pop().unwrap();
+        assert_eq!(g3, (1, 3, 1));
 
-        let scores = game.get_scores();
-        //dbg!(&game.queue);
-        let played_games = game.get_played_games();
-        dbg!(&played_games);
-        assert_eq!(played_games.len(), 1);
-        dbg!(&scores);
-        assert_eq!(scores[0].id, 1);
-        assert_eq!(scores[1].id, 2);
-        assert_eq!(scores[2].id, 3);
+        {
+            let scores = game.get_scores();
+            //dbg!(&game.queue);
+            assert_eq!(scores[0].id, 1);
+            assert_eq!(scores[1].id, 2);
+            assert_eq!(scores[2].id, 3);
+        }
+        {
+            let played_games = game.get_played_games();
+            dbg!(&played_games);
+            assert_eq!(played_games.len(), 1);
+        }
 
         // #3 wins, gets 6 + 2 points, 1 point for #1
-        game.add_result((1,3), Rps::Rock, Rps::Paper);
+        game.add_result((1,3, 1), Rps::Rock, Rps::Paper);
         let p1 = game.player_list.get(&1).unwrap();
         let p3 = game.player_list.get(&3).unwrap();
         assert_eq!(p1.score, 8);
