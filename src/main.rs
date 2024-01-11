@@ -36,13 +36,14 @@ pub fn NameInput(
     #[prop(into)]
     game: WriteSignal<Game>
 ) -> impl IntoView {
-    let (name, _set_name) = create_signal("".to_string());
+    let (name, set_name) = create_signal("".to_string());
     let input_element: NodeRef<Input> = create_node_ref();
     let on_submit = move |ev: SubmitEvent| {
         // Stop the page from reloading!
         ev.prevent_default();
         // Get value from input
         let value = input_element.get().expect("<input> to exist").value();
+        set_name.update(|n| *n = "".to_string());
         game.update(|g| {
             match g.add_player(&value) {
                 Ok(()) => (),
@@ -53,8 +54,8 @@ pub fn NameInput(
     view! {
         <div id="new_player">
         <form on:submit=on_submit>
-            <label for="newp">"Uusi pelaaja "</label>
-            <input type="text" id="newp" value=name node_ref=input_element/>
+            //<label for="newp">"Uusi pelaaja "</label>
+            <input type="text" id="newp" value=name prop:value=name node_ref=input_element/>
             <input type="submit" value="Lisää"/>
         </form>
         </div>
@@ -77,7 +78,7 @@ pub fn PlayerList(
         <table>
             <tr>
                 <th>Pelaaja</th>
-                <th>Pelit</th>
+                <th>Ottelut</th>
                 <th>Pisteet</th>
             </tr>
             <For
@@ -150,8 +151,8 @@ pub fn NextMatch(
     //let (value, set_value) = create_signal("B".to_string());
     //
 
-    let (value, set_value) = create_signal("None".to_string());
-    let (value2, set_value2) = create_signal("None".to_string());
+    let (value, set_value) = create_signal("?".to_string());
+    let (value2, set_value2) = create_signal("?".to_string());
         
     let on_submit = move |ev: SubmitEvent| {
         // Stop the page from reloading!
@@ -159,10 +160,12 @@ pub fn NextMatch(
         let play1 = value.get();
         let play2 = value2.get();
 
-        if (play1 == "None") | (play2 == "None") {
-            info!("One option was None");
+        if (play1 == "?") | (play2 == "?") {
+            info!("One option was ?");
             return;
         }
+        set_value.update(|v| *v = "?".to_string());
+        set_value2.update(|v| *v = "?".to_string());
         let m = game.get().get_next_game().unwrap().clone();
         let player1_id = m.player1;
         let player2_id = m.player2;
@@ -194,7 +197,7 @@ pub fn NextMatch(
                             let new_value = event_target_value(&ev);
                             set_value.set(new_value);
                         }>
-                            <SelectOption value is="None"/>
+                            <SelectOption value is="?"/>
                             <SelectOption value is=Rps::Rock.str()/>
                             <SelectOption value is=Rps::Paper.str()/>
                             <SelectOption value is=Rps::Scissors.str()/>
@@ -204,7 +207,7 @@ pub fn NextMatch(
                             let new_value = event_target_value(&ev);
                             set_value2.set(new_value);
                         }>
-                            <SelectOption value=value2 is="None"/>
+                            <SelectOption value=value2 is="?"/>
                             <SelectOption value=value2 is=Rps::Rock.str()/>
                             <SelectOption value=value2 is=Rps::Paper.str()/>
                             <SelectOption value=value2 is=Rps::Scissors.str()/>
