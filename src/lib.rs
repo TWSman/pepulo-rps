@@ -71,12 +71,12 @@ impl Game {
         }
     }
 
-    pub fn get_player_name(&self, pid: u16) -> String {
-        self.player_list.get(&pid).unwrap().name.clone()
+    pub fn get_player_name(&self, pid: u16) -> Option<String> {
+        Some(self.player_list.get(&pid)?.name.clone())
     }
 
-    pub fn get_player(&self, pid: u16) -> Player {
-        self.player_list.get(&pid).unwrap().clone().to_owned()
+    pub fn get_player(&self, pid: u16) -> Option<Player> {
+        Some(self.player_list.get(&pid)?.clone().to_owned())
     }
 
     fn update_scores(&mut self) {
@@ -84,7 +84,7 @@ impl Game {
         for p1 in keys {
             let (played, score) = self.get_score_for_player(p1);
 
-            let player = self.player_list.get_mut(&p1).unwrap();
+            let player = self.player_list.get_mut(&p1).expect("Key should exist");
             player.played = played;
             player.score = score;
         }
@@ -109,9 +109,9 @@ impl Game {
         let old_rounds = self.rounds;
         self.rounds = rounds;
         if rounds > old_rounds {
-            let keys = self.player_list.keys().collect::<Vec<_>>();
-            for player_id in keys {
-                let player = self.player_list.get(player_id).unwrap();
+            let ids = self.player_list.keys().collect::<Vec<_>>();
+            for player_id in ids {
+                let player = self.player_list.get(player_id).expect("Key should exist");
                 for (id, p) in &self.player_list {
                     if id <= player_id {
                         continue;
@@ -137,7 +137,7 @@ impl Game {
     pub fn get_next_games(&self, n: usize) -> Vec<&Match> {
         self.queue.clone().into_sorted_iter().filter_map(|(k, prior)| {
             if prior > 0 {
-                Some(self.match_list.get(&k).unwrap())
+                Some(self.match_list.get(&k).expect("Match list should include all queue elements"))
             } else {
                 None
             }
@@ -148,7 +148,7 @@ impl Game {
         if self.queue.iter().all(|(_k,p)| p < &0) {
             None
         } else {
-            let (i,_p) = self.queue.peek().unwrap();
+            let (i,_p) = self.queue.peek()?;
             self.match_list.get(i)
         }
     }
@@ -170,7 +170,7 @@ impl Game {
     pub fn get_played_games(&self) -> Vec<(&Match, i64)> {
         self.queue.clone().into_sorted_iter().filter_map(|(k, prior)|  {
             if prior < 0 {
-                Some((self.match_list.get(&k).unwrap(), prior))
+                Some((self.match_list.get(&k).expect("Match list should include all queue elements"), prior))
             } else {
                 None
             }
@@ -245,18 +245,22 @@ impl Game {
             info!("No played games");
             return;
         };
-        self.remove_result((p1,p2, round ));
+        let _ = self.remove_result((p1,p2, round ));
         info!("Removed latest play {} {} {}", p1, p2, round);
         self.update_scores();
         self.update_priorities();
     }
 
-    pub fn remove_result(&mut self, game_id: (u16, u16, u16)) {
-        let m = self.match_list.get_mut(&game_id).unwrap();
+    pub fn remove_result(&mut self, game_id: (u16, u16, u16)) -> Result<(), String> {
+        let m = match self.match_list.get_mut(&game_id) {
+            Some(m) => m,
+            None => return Err("No such game".to_string()),
+        };
         m.result = None;
         m.play1 = None;
         m.play2= None;
         info!("Removed play {} {}", game_id.0, game_id.1);
+        Ok(())
     }
 
     pub fn update_priorities(&mut self) {
@@ -377,6 +381,14 @@ impl Player {
     }
 }
 
+#[derive(Hash, Debug, Copy, Clone, PartialEq, Eq, FromPrimitive)]
+pub enum Rpsls {
+    Rock,
+    Paper,
+    Scissors,
+    Spock,
+    Lizard,
+}
 
 #[derive(Hash, Debug, Copy, Clone, PartialEq, Eq, FromPrimitive)]
 pub enum Rps {
@@ -406,6 +418,69 @@ impl RpsResult {
 impl Display for Rps {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.str())
+    }
+}
+
+impl Display for Rpsls {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.str())
+    }
+}
+
+#[allow(dead_code)]
+impl Rpsls {
+    fn get_score(&self) -> u16 {
+        match self {
+            Self::Rock => 1,
+            Self::Paper => 2,
+            Self::Scissors => 3,
+            Self::Lizard => 4,
+            Self::Spock => 5,
+        }
+    }
+
+    pub fn str(&self) -> &str {
+        match self {
+            Rpsls::Rock => "🪨",
+            Rpsls::Paper => "📜",
+            Rpsls::Scissors => "✂️",
+            Rpsls::Lizard => "🦎",
+            Rpsls::Spock => "🖖",
+        }
+    }
+
+
+    pub fn new(inp: &str) -> Self {
+        match inp {
+            "🪨" => Self::Rock,
+            "📜" => Self::Paper,
+            "✂️" => Self::Scissors,
+            "🖖" => Self::Spock,
+            "🦎" => Self::Lizard,
+            _ => panic!("Unknown string"),
+        }
+    }
+
+    fn result(&self, other: &Rpsls) -> RpsResult {
+        if self == other {
+            RpsResult::Draw
+        } else if other == &self.win().0 {
+            RpsResult::Lose
+        } else if other == &self.win().1 {
+            RpsResult::Lose
+        } else {
+            RpsResult::Win
+        }
+    }
+
+    fn win(&self) -> (Self, Self) {
+        (FromPrimitive::from_u8((*self as u8 + 1) % 5).unwrap(),
+        FromPrimitive::from_u8((*self as u8 + 3) % 5).unwrap())
+    }
+
+    fn lose(&self) -> (Self, Self) {
+        (FromPrimitive::from_u8((*self as u8 + 4) % 5).unwrap(),
+        FromPrimitive::from_u8((*self as u8 + 2) % 5).unwrap())
     }
 }
 
@@ -447,11 +522,11 @@ impl Rps {
         }
     }
 
-    fn win(&self) -> Rps {
+    fn win(&self) -> Self {
         FromPrimitive::from_u8((*self as u8 + 1) % 3).unwrap()
     }
 
-    fn lose(&self) -> Rps {
+    fn lose(&self) -> Self {
         FromPrimitive::from_u8((*self as u8 + 2) % 3).unwrap()
     }
 }
@@ -468,6 +543,25 @@ mod tests {
         assert_eq!(rock.result(&rock), RpsResult::Draw);
         assert_eq!(rock.result(&paper), RpsResult::Lose);
         assert_eq!(rock.result(&scissors), RpsResult::Win);
+        assert_eq!(paper.result(&scissors), RpsResult::Lose);
+        assert_eq!(paper.result(&rock), RpsResult::Win);
+        assert_eq!(scissors.result(&rock), RpsResult::Lose);
+        assert_eq!(scissors.result(&paper), RpsResult::Win);
+    }
+
+    #[test]
+    fn rpsls() {
+        let rock = Rpsls::Rock;
+        let paper = Rpsls::Paper;
+        let scissors = Rpsls::Scissors;
+        let lizard = Rpsls::Lizard;
+        let spock = Rpsls::Spock;
+        assert_eq!(rock.result(&rock), RpsResult::Draw);
+        assert_eq!(rock.result(&paper), RpsResult::Lose);
+        assert_eq!(rock.result(&scissors), RpsResult::Win);
+        assert_eq!(lizard.result(&spock), RpsResult::Win);
+        assert_eq!(lizard.result(&paper), RpsResult::Win);
+        assert_eq!(rock.result(&lizard), RpsResult::Win);
         assert_eq!(paper.result(&scissors), RpsResult::Lose);
         assert_eq!(paper.result(&rock), RpsResult::Win);
         assert_eq!(scissors.result(&rock), RpsResult::Lose);

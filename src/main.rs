@@ -4,6 +4,7 @@ use pepulo_rps::{Game,Rps};
 use log::Level;
 use log::info;
 use log::debug;
+use itertools::Itertools;
 
 fn main() {
     _ = console_log::init_with_level(Level::Info);
@@ -175,8 +176,8 @@ pub fn NextMatch(
         Some(m) => {
             let p1 = m.player1;
             let p2 = m.player2;
-            let player1_name = game.get().get_player_name(p1);
-            let player2_name = game.get().get_player_name(p2);
+            let player1_name = game.get().get_player_name(p1).unwrap();
+            let player2_name = game.get().get_player_name(p2).unwrap();
             let n_games = game.get().get_left_n();
 
             view! {
@@ -256,12 +257,13 @@ set_game: WriteSignal<Game>,
 
     let data = move || game.get().get_played_games()
         .iter()
+        .rev()
         .map(|(m,p)| {
 
             let id1 = m.player1;
             let id2 = m.player2;
-            let player1 = game.get().get_player_name(id1);
-            let player2 = game.get().get_player_name(id2);
+            let player1 = game.get().get_player_name(id1).unwrap();
+            let player2 = game.get().get_player_name(id2).unwrap();
             let (score1, score2) = m.get_score();
             let play1 = m.play1.unwrap().str().to_string();
             let play2 = m.play2.unwrap().str().to_string();
@@ -278,7 +280,7 @@ set_game: WriteSignal<Game>,
                 prior: *p,
                 round: m.round,
             }
-        })
+        }).with_position()
         .collect::<Vec<_>>();
 
     let quote = move || {
@@ -286,13 +288,25 @@ set_game: WriteSignal<Game>,
         view! {<p>"\"" {quote} "\""</p><p>" - "{author}</p>}
     };
 
-
     view! {
+        <h2>Seuraavana:</h2>
+        <p>
+            <NextMatch game=game set_game=set_game/>
+        </p>
+        <hr/>
+        <div>{quote}</div>
+        <hr/>
+
         <table>
+            <tr>
+                <td class="trashcan"
+            on:click = move |_| {set_game.update(|g| g.remove_latest())}
+            >"🗑️"</td>
+            </tr>
             <For
                 each=move || { data() }
-                key=|p| (p.name1.clone(), p.name2.clone(), p.round)
-                children=|child| {
+                key=|(pos, p)| (p.name1.clone(), p.name2.clone(), p.round)
+                children=|(pos, child)| {
                     view! {
                         <tr>
                             //<td>{child.round}</td>
@@ -304,24 +318,14 @@ set_game: WriteSignal<Game>,
                             <td>{child.name2}</td>
                             <td>{child.play2}</td>
                             <td>{child.score2} "p"</td>
+                            
                         </tr>
                     }
                 }
             />
-            <tr>
-                <td class="trashcan"
-            on:click = move |_| {set_game.update(|g| g.remove_latest())}
-            >"🗑️"</td>
-            </tr>
 
         </table>
-        <h2>Seuraavana:</h2>
-        <p>
-            <NextMatch game=game set_game=set_game/>
-        </p>
 
-        <hr/>
-        <div>{quote}</div>
     }
 }
 
@@ -329,13 +333,13 @@ set_game: WriteSignal<Game>,
 fn App() -> impl IntoView {
     let (game, set_game) = create_signal(Game::new());
     set_game.update(|g| g.set_rounds(2));
-    //set_game.update(|g| {let _ = g.add_player("Alice");});
-    //set_game.update(|g| {let _ = g.add_player("Bob");});
-    //set_game.update(|g| {let _ = g.add_player("Charlie");});
-    //set_game.update(|g| {let _ = g.add_player("Daniel");});
-    //set_game.update(|g| {let _ = g.add_player("Eric");});
-    //set_game.update(|g| g.add_result((1,2,1), Rps::Rock, Rps::Scissors));
-    //set_game.update(|g| g.add_result((3,4,1), Rps::Rock, Rps::Paper));
+    set_game.update(|g| {let _ = g.add_player("Alice");});
+    set_game.update(|g| {let _ = g.add_player("Bob");});
+    set_game.update(|g| {let _ = g.add_player("Charlie");});
+    set_game.update(|g| {let _ = g.add_player("Daniel");});
+    set_game.update(|g| {let _ = g.add_player("Eric");});
+    set_game.update(|g| g.add_result((1,2,1), Rps::Rock, Rps::Scissors));
+    set_game.update(|g| g.add_result((3,4,1), Rps::Rock, Rps::Paper));
     let (show_names, set_names) = create_signal(false);
     let (show_games, set_games) = create_signal(false);
 
