@@ -1,6 +1,6 @@
 use leptos::{ev::SubmitEvent, *};
 use leptos::html::Input;
-use pepulo_rps::{Game,Rps};
+use pepulo_rps::{Game,Rpssl,Playable};
 use log::Level;
 use log::info;
 use log::debug;
@@ -159,9 +159,8 @@ pub fn NextMatch(
         let player1_id = m.player1;
         let player2_id = m.player2;
         let round = m.round;
-        //let play1 = Rps::new(play1);
-        let play1 = Rps::new(&play1[..]);
-        let play2 = Rps::new(&play2[..]);
+        let play1 = Rpssl::new(&play1[..]);
+        let play2 = Rpssl::new(&play2[..]);
         let message = format!("Add result for {} {} v. {} {}", player1_id, play1, player2_id, play2).to_string();
         debug!("{}", message);
         set_game.update(|g| {
@@ -192,9 +191,9 @@ pub fn NextMatch(
                             set_value.set(new_value);
                         }>
                             <SelectOption value is="?"/>
-                            <SelectOption value is=Rps::Rock.str()/>
-                            <SelectOption value is=Rps::Paper.str()/>
-                            <SelectOption value is=Rps::Scissors.str()/>
+                            <SelectOption value is=Rpssl::Rock.str()/>
+                            <SelectOption value is=Rpssl::Paper.str()/>
+                            <SelectOption value is=Rpssl::Scissors.str()/>
                         </select>
                         " Vs. " {player2_name} "   "
                         <select id="player2select" on:change=move |ev| {
@@ -202,9 +201,9 @@ pub fn NextMatch(
                             set_value2.set(new_value);
                         }>
                             <SelectOption value=value2 is="?"/>
-                            <SelectOption value=value2 is=Rps::Rock.str()/>
-                            <SelectOption value=value2 is=Rps::Paper.str()/>
-                            <SelectOption value=value2 is=Rps::Scissors.str()/>
+                            <SelectOption value=value2 is=Rpssl::Rock.str()/>
+                            <SelectOption value=value2 is=Rpssl::Paper.str()/>
+                            <SelectOption value=value2 is=Rpssl::Scissors.str()/>
                         </select>
                         <input type="submit" value="Lisää"/>
                     </p>
@@ -265,8 +264,8 @@ set_game: WriteSignal<Game>,
             let player1 = game.get().get_player_name(id1).unwrap();
             let player2 = game.get().get_player_name(id2).unwrap();
             let (score1, score2) = m.get_score();
-            let play1 = m.play1.unwrap().str().to_string();
-            let play2 = m.play2.unwrap().str().to_string();
+            let play1 = m.play1.str().to_string();
+            let play2 = m.play2.str().to_string();
 
             GameScore {
                 name1: player1.clone(),
@@ -305,8 +304,8 @@ set_game: WriteSignal<Game>,
             </tr>
             <For
                 each=move || { data() }
-                key=|(pos, p)| (p.name1.clone(), p.name2.clone(), p.round)
-                children=|(pos, child)| {
+                key=|(_pos, p)| (p.name1.clone(), p.name2.clone(), p.round)
+                children=|(_pos, child)| {
                     view! {
                         <tr>
                             //<td>{child.round}</td>
@@ -338,8 +337,8 @@ fn App() -> impl IntoView {
     set_game.update(|g| {let _ = g.add_player("Charlie");});
     set_game.update(|g| {let _ = g.add_player("Daniel");});
     set_game.update(|g| {let _ = g.add_player("Eric");});
-    set_game.update(|g| g.add_result((1,2,1), Rps::Rock, Rps::Scissors));
-    set_game.update(|g| g.add_result((3,4,1), Rps::Rock, Rps::Paper));
+    set_game.update(|g| g.add_result((1,2,1), Rpssl::Rock, Rpssl::Scissors));
+    set_game.update(|g| g.add_result((3,4,1), Rpssl::Rock, Rpssl::Paper));
     let (show_names, set_names) = create_signal(false);
     let (show_games, set_games) = create_signal(false);
 

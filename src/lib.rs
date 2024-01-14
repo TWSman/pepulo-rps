@@ -42,6 +42,11 @@ fn get_quote(i: usize) -> (String, String) {
     (q.0.to_string(), q.1.to_string())
 }
 
+#[derive(Debug, Clone)]
+pub enum GameMode {
+    RPS,
+    RPSSL,
+}
 
 #[derive(Debug, Clone)]
 pub struct Game {
@@ -51,6 +56,7 @@ pub struct Game {
     queue: PriorityQueue<(u16, u16, u16), i64>,
     rng_seed: usize,
     rounds: usize,
+    game_mode: GameMode,
 }
 
 
@@ -68,6 +74,7 @@ impl Game {
             queue: PriorityQueue::new(),
             rng_seed: rand::thread_rng().gen_range(0..100),
             rounds: 1,
+            game_mode: GameMode::RPS,
         }
     }
 
@@ -103,6 +110,15 @@ impl Game {
         (matches.len() as u16, 
             matches.iter().map(|(_,m)| m.get_score_for_player(pid)).sum()
         )
+    }
+
+    pub fn set_mode(&mut self, game_mode: GameMode) -> Result<(), String>{
+        if self.get_played_n() > 0 {
+            Err(String::from("Remove played games before changing game mode"))
+        } else {
+            self.game_mode = game_mode;
+            Ok(())
+        }
     }
 
     pub fn set_rounds(&mut self, rounds: usize) {
@@ -208,7 +224,7 @@ impl Game {
         Ok(())
     }
 
-    pub fn add_result(&mut self, game_id: (u16, u16, u16), play1: Rps, play2: Rps) {
+    pub fn add_result(&mut self, game_id: (u16, u16, u16), play1: Rpssl, play2: Rpssl) {
         debug!("Adding result to game {} {} {}", game_id.0, game_id.1, game_id.2);
         let m = self.match_list.get_mut(&game_id).unwrap();
         let player1 = self.player_list.get_mut(&m.player1).unwrap();
@@ -221,8 +237,8 @@ impl Game {
         player1.played += 1;
         player1.score += player1_score;
         debug!("Player {} has played {} games with a total score {}", player1.name, &player1.played, &player1.score);
-        m.play1 = Some(play1);
-        m.play2 = Some(play2);
+        m.play1 = play1;
+        m.play2 = play2;
         m.result = Some(result);
         let player2 = self.player_list.get_mut(&m.player2).unwrap();
         let name2 = player2.name.clone();
@@ -257,8 +273,8 @@ impl Game {
             None => return Err("No such game".to_string()),
         };
         m.result = None;
-        m.play1 = None;
-        m.play2= None;
+        m.play1 = Rpssl::None;
+        m.play2= Rpssl::None;
         info!("Removed play {} {}", game_id.0, game_id.1);
         Ok(())
     }
@@ -321,8 +337,8 @@ impl Game {
 pub struct Match {
     pub player1: u16, 
     pub player2: u16,
-    pub play1: Option<Rps>,
-    pub play2: Option<Rps>,
+    pub play1: Rpssl,
+    pub play2: Rpssl,
     pub result: Option<RpsResult>,
     pub round: u16,
 }
@@ -332,8 +348,8 @@ impl Match {
         Match {
             player1: player1.id,
             player2: player2.id,
-            play1: None,
-            play2: None,
+            play1: Rpssl::None,
+            play2: Rpssl::None,
             result: None,
             round,
         }
@@ -344,8 +360,8 @@ impl Match {
             return (0,0);
         }
         let score = self.result.as_ref().unwrap().get_score();
-        let player1_score = self.play1.unwrap().get_score() + score;
-        let player2_score = self.play2.unwrap().get_score() + (6 - score);
+        let player1_score = self.play1.get_score() + score;
+        let player2_score = self.play2.get_score() + (6 - score);
         (player1_score, player2_score)
     }
 
@@ -381,13 +397,23 @@ impl Player {
     }
 }
 
+pub trait Playable: fmt::Display {
+    fn str(&self) -> &str;
+    fn get_score(&self) -> u16;
+    fn new(inp: &str) -> Self;
+    fn result(&self, other: &Self) -> RpsResult;
+    fn is_none(&self) -> bool;
+    fn is_some(&self) -> bool;
+}
+
 #[derive(Hash, Debug, Copy, Clone, PartialEq, Eq, FromPrimitive)]
-pub enum Rpsls {
+pub enum Rpssl {
     Rock,
     Paper,
     Scissors,
     Spock,
     Lizard,
+    None,
 }
 
 #[derive(Hash, Debug, Copy, Clone, PartialEq, Eq, FromPrimitive)]
@@ -395,6 +421,7 @@ pub enum Rps {
     Rock,
     Paper,
     Scissors,
+    None,
 }
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone)]
@@ -421,14 +448,25 @@ impl Display for Rps {
     }
 }
 
-impl Display for Rpsls {
+impl Display for Rpssl {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.str())
     }
 }
 
-#[allow(dead_code)]
-impl Rpsls {
+
+impl Playable for Rpssl {
+    fn str(&self) -> &str {
+        match self {
+            Self::Rock => "🪨",
+            Self::Paper => "📜",
+            Self::Scissors => "✂️",
+            Self::Lizard => "🦎",
+            Self::Spock => "🖖",
+            Self::None => "?",
+        }
+    }
+
     fn get_score(&self) -> u16 {
         match self {
             Self::Rock => 1,
@@ -436,32 +474,23 @@ impl Rpsls {
             Self::Scissors => 3,
             Self::Lizard => 4,
             Self::Spock => 5,
+            Self::None => 0,
         }
     }
 
-    pub fn str(&self) -> &str {
-        match self {
-            Rpsls::Rock => "🪨",
-            Rpsls::Paper => "📜",
-            Rpsls::Scissors => "✂️",
-            Rpsls::Lizard => "🦎",
-            Rpsls::Spock => "🖖",
-        }
-    }
-
-
-    pub fn new(inp: &str) -> Self {
+    fn new(inp: &str) -> Self {
         match inp {
             "🪨" => Self::Rock,
             "📜" => Self::Paper,
             "✂️" => Self::Scissors,
             "🖖" => Self::Spock,
             "🦎" => Self::Lizard,
+            "?" => Self::None,
             _ => panic!("Unknown string"),
         }
     }
 
-    fn result(&self, other: &Rpsls) -> RpsResult {
+    fn result(&self, other: &Rpssl) -> RpsResult {
         if self == other {
             RpsResult::Draw
         } else if other == &self.win().0 {
@@ -473,6 +502,17 @@ impl Rpsls {
         }
     }
 
+    fn is_none(&self) -> bool {
+        self == &Rpssl::None
+    }
+
+    fn is_some(&self) -> bool {
+        !self.is_none()
+    }
+}
+
+#[allow(dead_code)]
+impl Rpssl {
     fn win(&self) -> (Self, Self) {
         (FromPrimitive::from_u8((*self as u8 + 1) % 5).unwrap(),
         FromPrimitive::from_u8((*self as u8 + 3) % 5).unwrap())
@@ -484,26 +524,26 @@ impl Rpsls {
     }
 }
 
-#[allow(dead_code)]
-impl Rps {
+impl Playable for Rps {
     fn get_score(&self) -> u16 {
         match self {
-            Rps::Rock => 1,
-            Rps::Paper => 2,
-            Rps::Scissors => 3,
+            Self::Rock => 1,
+            Self::Paper => 2,
+            Self::Scissors => 3,
+            Self::None => 0,
         }
     }
 
-    pub fn str(&self) -> &str {
+    fn str(&self) -> &str {
         match self {
-            Rps::Rock => "🪨",
-            Rps::Paper => "📜",
-            Rps::Scissors => "✂️",
+            Self::Rock => "🪨",
+            Self::Paper => "📜",
+            Self::Scissors => "✂️",
+            Self::None => "?",
         }
     }
 
-
-    pub fn new(inp: &str) -> Self {
+    fn new(inp: &str) -> Self {
         match inp {
             "🪨" => Self::Rock,
             "📜" => Self::Paper,
@@ -512,7 +552,7 @@ impl Rps {
         }
     }
 
-    fn result(&self, other: &Rps) -> RpsResult {
+    fn result(&self, other: &Self) -> RpsResult {
         if self == other {
             RpsResult::Draw
         } else if other == &self.win() {
@@ -521,6 +561,18 @@ impl Rps {
             RpsResult::Win
         }
     }
+
+    fn is_none(&self) -> bool {
+        self == &Self::None
+    }
+
+    fn is_some(&self) -> bool {
+        !self.is_none()
+    }
+}
+
+#[allow(dead_code)]
+impl Rps {
 
     fn win(&self) -> Self {
         FromPrimitive::from_u8((*self as u8 + 1) % 3).unwrap()
@@ -550,12 +602,12 @@ mod tests {
     }
 
     #[test]
-    fn rpsls() {
-        let rock = Rpsls::Rock;
-        let paper = Rpsls::Paper;
-        let scissors = Rpsls::Scissors;
-        let lizard = Rpsls::Lizard;
-        let spock = Rpsls::Spock;
+    fn rpssl() {
+        let rock = Rpssl::Rock;
+        let paper = Rpssl::Paper;
+        let scissors = Rpssl::Scissors;
+        let lizard = Rpssl::Lizard;
+        let spock = Rpssl::Spock;
         assert_eq!(rock.result(&rock), RpsResult::Draw);
         assert_eq!(rock.result(&paper), RpsResult::Lose);
         assert_eq!(rock.result(&scissors), RpsResult::Win);
@@ -575,8 +627,8 @@ mod tests {
         let _ = game.add_player("Bob");
         let _ = game.add_player("Charlie");
 
-        game.add_result((1, 2, 1), Rps::Rock, Rps::Scissors);
-        game.add_result((1, 3, 1), Rps::Rock, Rps::Paper);
+        game.add_result((1, 2, 1), Rpssl::Rock, Rpssl::Scissors);
+        game.add_result((1, 3, 1), Rpssl::Rock, Rpssl::Paper);
 
         let _ = game.add_player("David");
         game.update_priorities();
@@ -602,7 +654,7 @@ mod tests {
         assert_eq!(played_games.len(), 2);
 
         dbg!(&game.queue);
-        let (g3, p) = game.queue.pop().unwrap();
+        let (g3, _p) = game.queue.pop().unwrap();
         assert_eq!(g3, (2,4 ,1));
 
         let scores = game.get_scores();
@@ -615,9 +667,9 @@ mod tests {
     #[test]
     fn rounds() {
         let mut game = Game::new();
-        game.add_player("Alice");
-        game.add_player("Bob");
-        game.add_player("Charlie");
+        let _ = game.add_player("Alice");
+        let _ = game.add_player("Bob");
+        let _ = game.add_player("Charlie");
         assert_eq!(game.get_left_n(), 3);
         game.set_rounds(2);
         dbg!(&game.match_list);
@@ -627,23 +679,23 @@ mod tests {
     #[test]
     fn game() {
         let mut game = Game::new();
-        game.add_player("Alice");
+        let _ = game.add_player("Alice");
         assert_eq!(game.player_list.len(), 1);
         assert_eq!(game.match_list.len(), 0);
         assert_eq!(game.queue.len(), 0);
-        game.add_player("Bob");
+        let _ = game.add_player("Bob");
         assert_eq!(game.player_list.len(), 2);
         assert_eq!(game.match_list.len(), 1);
         assert_eq!(game.queue.len(), 1);
 
-        game.add_player("Charlie");
+        let _ = game.add_player("Charlie");
         assert_eq!(game.player_list.len(), 3);
         assert_eq!(game.match_list.len(), 3);
         assert_eq!(game.queue.len(), 3);
 
         //game.update_priorities();
 
-        game.add_result((1,2, 1), Rps::Rock, Rps::Scissors);
+        game.add_result((1,2, 1), Rpssl::Rock, Rpssl::Scissors);
         let p1 = game.player_list.get(&1).unwrap();
         let p2 = game.player_list.get(&2).unwrap();
         assert_eq!(p1.score, 7);
@@ -675,7 +727,7 @@ mod tests {
         }
 
         // #3 wins, gets 6 + 2 points, 1 point for #1
-        game.add_result((1,3, 1), Rps::Rock, Rps::Paper);
+        game.add_result((1,3, 1), Rpssl::Rock, Rpssl::Paper);
         let p1 = game.player_list.get(&1).unwrap();
         let p3 = game.player_list.get(&3).unwrap();
         assert_eq!(p1.score, 8);
