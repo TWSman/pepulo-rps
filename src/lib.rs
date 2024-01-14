@@ -9,6 +9,8 @@ use std::fmt::Display;
 use core::fmt;
 use log::info;
 use log::debug;
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
 
 fn get_quote(i: usize) -> (String, String) {
     let quotes: Vec<(&str, &str)> = vec![
@@ -42,7 +44,7 @@ fn get_quote(i: usize) -> (String, String) {
     (q.0.to_string(), q.1.to_string())
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GameMode {
     RPS,
     RPSSL,
@@ -56,7 +58,7 @@ pub struct Game {
     queue: PriorityQueue<(u16, u16, u16), i64>,
     rng_seed: usize,
     rounds: usize,
-    game_mode: GameMode,
+    pub game_mode: GameMode,
 }
 
 
@@ -76,6 +78,10 @@ impl Game {
             rounds: 1,
             game_mode: GameMode::RPS,
         }
+    }
+
+    pub fn get_options(&self) -> Vec<Rpssl> {
+        Rpssl::iter().collect::<Vec<_>>()
     }
 
     pub fn get_player_name(&self, pid: u16) -> Option<String> {
@@ -406,7 +412,7 @@ pub trait Playable: fmt::Display {
     fn is_some(&self) -> bool;
 }
 
-#[derive(Hash, Debug, Copy, Clone, PartialEq, Eq, FromPrimitive)]
+#[derive(Hash, Debug, Copy, Clone, PartialEq, Eq, FromPrimitive, EnumIter)]
 pub enum Rpssl {
     Rock,
     Paper,
