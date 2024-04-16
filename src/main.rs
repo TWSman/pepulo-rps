@@ -1,6 +1,6 @@
 use leptos::{ev::SubmitEvent, *};
 use leptos::html::Input;
-use pepulo_rps::{Game,Rpssl,Playable};
+use pepulo_rps::{Game,Rpssl,Playable,GameMode};
 use log::Level;
 use log::info;
 use log::debug;
@@ -132,7 +132,7 @@ fn Scores() -> impl IntoView {
 
 
 #[component]
-pub fn NextMatch(
+pub fn CurrentMatch(
     #[prop(into)]
     game: ReadSignal<Game>,
     set_game: WriteSignal<Game>,
@@ -171,6 +171,8 @@ pub fn NextMatch(
         );
     };
 
+    let mode = move || game.with(|g| g.get_mode());
+
     move || match game.get().get_next_game() {
         Some(m) => {
             let p1 = m.player1;
@@ -194,6 +196,15 @@ pub fn NextMatch(
                             <SelectOption value is=Rpssl::Rock.str()/>
                             <SelectOption value is=Rpssl::Paper.str()/>
                             <SelectOption value is=Rpssl::Scissors.str()/>
+                            { if mode() == GameMode::RPSSL {
+                                view! {
+                                    <SelectOption value is=Rpssl::Spock.str()/>
+                                    <SelectOption value is=Rpssl::Lizard.str()/>
+                                }.into_view()
+                            } else {
+                                view! {}.into_view()
+                            }
+                            }
                         </select>
                         " Vs. " {player2_name} "   "
                         <select id="player2select" on:change=move |ev| {
@@ -204,6 +215,15 @@ pub fn NextMatch(
                             <SelectOption value=value2 is=Rpssl::Rock.str()/>
                             <SelectOption value=value2 is=Rpssl::Paper.str()/>
                             <SelectOption value=value2 is=Rpssl::Scissors.str()/>
+                            { if mode() == GameMode::RPSSL {
+                                view! {
+                                    <SelectOption value=value2 is=Rpssl::Spock.str()/>
+                                    <SelectOption value=value2 is=Rpssl::Lizard.str()/>
+                                }.into_view()
+                            } else {
+                                view! {}.into_view()
+                            }
+                            }
                         </select>
                         <input type="submit" value="Lisää"/>
                     </p>
@@ -290,7 +310,7 @@ set_game: WriteSignal<Game>,
     view! {
         <h2>Seuraavana:</h2>
         <p>
-            <NextMatch game=game set_game=set_game/>
+            <CurrentMatch game=game set_game=set_game/>
         </p>
         <hr/>
         <div>{quote}</div>
@@ -331,6 +351,7 @@ set_game: WriteSignal<Game>,
 #[component]
 fn App() -> impl IntoView {
     let (game, set_game) = create_signal(Game::new());
+    //set_game.update(|g| {let _ = g.set_mode(GameMode::RPSSL);});
     set_game.update(|g| g.set_rounds(2));
     set_game.update(|g| {let _ = g.add_player("Alice");});
     set_game.update(|g| {let _ = g.add_player("Bob");});
@@ -341,6 +362,7 @@ fn App() -> impl IntoView {
     set_game.update(|g| g.add_result((3,4,1), Rpssl::Rock, Rpssl::Paper));
     let (show_names, set_names) = create_signal(false);
     let (show_games, set_games) = create_signal(false);
+    let (show_options, set_options) = create_signal(false);
 
     view! {
         <div class="header" id="header">
@@ -359,8 +381,7 @@ fn App() -> impl IntoView {
             <div
                 class="nnn"
                 id="player_list"
-                on:click=move |_| set_names.update(|value| *value = true)
-            >
+                on:click=move |_| set_names.update(|value| *value = true) >
                 <Show when=move || { show_names.get() } fallback=|| view! { <h1>"Pelaajat"</h1> }>
                     <p class="close" on:click=move |_| set_names.update(|value| *value = false)>
                         X
@@ -371,6 +392,27 @@ fn App() -> impl IntoView {
 
                 </Show>
             </div>
+            <div class="nnn" id="options" on:click=move |_| set_options.update(|value| *value = true)>
+                <Show when=move || { show_options.get() } fallback=|| view! { <h1>"Setup"</h1> }>
+                    <p class="close" on:click=move |_| set_options.update(|value| *value = false)>
+                        X
+                    </p>
+                    <Setup game=game set_game=set_game/>
+                </Show>
+            </div>
         </div>
+    }
+}
+
+#[component]
+pub fn Setup(
+game: ReadSignal<Game>,
+set_game: WriteSignal<Game>,
+) -> impl IntoView {
+    view! {
+        <h2>Setup:</h2>
+        <button on:click=move |_| set_game.update(|game| { let _ =game.set_mode(GameMode::RPS);})>KPS</button>
+        <button on:click=move |_| set_game.update(|game| { let _ =game.set_mode(GameMode::RPSSL);})>Lizard-Spock</button>
+        <p>"Current mode: " {game.get().get_mode().str().to_string()}</p>
     }
 }

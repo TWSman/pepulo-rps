@@ -50,6 +50,15 @@ pub enum GameMode {
     RPSSL,
 }
 
+impl GameMode {
+    pub fn str(&self) -> &str {
+        match self {
+            Self::RPS => "RPS",
+            Self::RPSSL => "RPSSL",
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Game {
     pub player_list: BTreeMap<u16, Player>,
@@ -58,7 +67,7 @@ pub struct Game {
     queue: PriorityQueue<(u16, u16, u16), i64>,
     rng_seed: usize,
     rounds: usize,
-    pub game_mode: GameMode,
+    game_mode: GameMode,
 }
 
 
@@ -125,6 +134,10 @@ impl Game {
             self.game_mode = game_mode;
             Ok(())
         }
+    }
+
+    pub fn get_mode(&self) -> GameMode {
+        self.game_mode.clone()
     }
 
     pub fn set_rounds(&mut self, rounds: usize) {
