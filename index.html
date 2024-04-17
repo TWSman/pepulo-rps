@@ -2,14 +2,79 @@
 <html lang="en">
 <style>
 
-.nnn {
-	border-style: solid;
-	margin: 10px;
-	padding: 10px;
+:root {
+  --2color-primary: #145374; /* Deep Ocean Blue */
+  --2color-secondary: #333333; /* Dark Gray */
+  --2color-accent: #ffcc00; /* Golden Yellow */
+  --2color-background: #1a1a1a; /* Dark Gray/Black */
+  --2color-text: #ffffff; /* White Text */
+}
+
+:root {
+  --color-primary: #3366ff; /* Deep Ocean Blue */
+  --color-secondary: #333333; /* Dark Gray */
+  --color-accent: #9933ff; /* Golden Yellow */
+  --color-background: #1a1a1a; /* Dark Gray/Black */
+  --color-text: #ffffff; /* White Text */
+}
+
+:root {
+	/** CSS DARK THEME PRIMARY COLORS */
+	--color-primary-100:  #382bf0;
+	--color-primary-200:  #5e43f3;
+	--color-primary-300:  #7a5af5;
+	--color-primary-400:  #9171f8;
+	--color-primary-500:  #a688fa;
+	--color-primary-600:  #ba9ffb;
+
+
+	/** CSS DARK THEME SURFACE COLORS */
+
+	--color-surface-100:  #121212;
+	--color-surface-200:  #282828;
+	--color-surface-300:  #3f3f3f;
+	--color-surface-400:  #575757;
+	--color-surface-500:  #717171;
+	--color-surface-600:  #8b8b8b;
+
+
+	/** CSS DARK THEME MIXED SURFACE COLORS */
+
+	--color-surface-mixed-100:  #1a1625;
+	--color-surface-mixed-200:  #2f2b3a;
+	--color-surface-mixed-300:  #46424f;
+	--color-surface-mixed-400:  #5e5a66;
+	--color-surface-mixed-500:  #76737e;
+	--color-surface-mixed-600:  #908d96;
+}
+
+
+h1 {
+	color: var(--color-text);
+}
+
+h2 {
+	color: var(--color-primary-500);
+}
+
+
+option {
+	font-size: 20px;
+	padding: 0px 0px;
+}
+
+body {
+	background-color: var(--color-surface-100);
+	color: var(--color-text);
 }
 
 .header {
 	border-style: solid;
+	padding: 0 10em;
+	background-color: var(--color-surface-400);
+	color: var(--color-text);
+	border-color: var(--color-surface-400);
+	border-radius: 10px;
 }
 
 #new_player {
@@ -19,8 +84,17 @@
 	float: right;
 }
 
+.nnn {
+	border-style: solid;
+	border-radius: 10px;
+	margin: 10px;
+	padding: 10px;
+	background-color: var(--color-surface-200);
+	border-color: var(--color-surface-200);
+}
+
 .nnn:hover {
-	border-color: red;
+	border-color: var(--color-primary-300);
 	cursor: pointer;
 }
 
@@ -41,6 +115,10 @@
 #container {
 	display: grid;
 	grid-template-columns: repeat(3, 1fr);
+}
+
+th {
+	color: var(--color-primary-500);
 }
 
 .play_select:hover {
