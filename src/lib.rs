@@ -163,10 +163,49 @@ impl Game {
                 }
             }
         }
+        if rounds < old_rounds {
+            let ids = self.player_list.keys().collect::<Vec<_>>();
+            for player_id in ids {
+                for (id, p) in &self.player_list {
+                    if id <= player_id {
+                        continue;
+                    }
+                    for round in (rounds+1)..=(old_rounds) {
+                        if self.match_list.contains_key(&(p.id, *player_id, round as u16)) {
+                            info!("Remove match");
+                            self.match_list.remove(&(*id, *player_id, round as u16));
+                            self.queue.remove(&(*id, *player_id, round as u16));
+                        }
+                    }
+                }
+            }
+            self.update_priorities();
+        }
     }
 
     pub fn get_rounds(&mut self) -> usize {
         self.rounds
+    }
+
+    pub fn add_rounds(&mut self) -> Result<(), String> {
+        self.set_rounds(self.rounds + 1);
+        Ok(())
+    }
+
+    pub fn empty(&mut self) -> Result<(), String> {
+        self.queue = PriorityQueue::new();
+        self.player_list = BTreeMap::new();
+        self.match_list = BTreeMap::new();
+        Ok(())
+    }
+
+    pub fn remove_rounds(&mut self) -> Result<(), String> {
+        if self.rounds > 1 {
+            self.set_rounds(self.rounds - 1);
+            return Ok(());
+        } else {
+            return Err("Player Already exists".to_string());
+        }
     }
 
     pub fn get_next_games(&self, n: usize) -> Vec<&Match> {
@@ -430,7 +469,7 @@ pub enum Rpssl {
     Rock,
     Paper,
     Scissors,
-    Spock,
+    Vampire,
     Lizard,
     None,
 }
@@ -481,7 +520,7 @@ impl Playable for Rpssl {
             Self::Paper => "📜",
             Self::Scissors => "✂️",
             Self::Lizard => "🦎",
-            Self::Spock => "🖖",
+            Self::Vampire => "🧛",
             Self::None => "?",
         }
     }
@@ -492,7 +531,7 @@ impl Playable for Rpssl {
             Self::Paper => 2,
             Self::Scissors => 3,
             Self::Lizard => 4,
-            Self::Spock => 5,
+            Self::Vampire => 5,
             Self::None => 0,
         }
     }
@@ -502,7 +541,7 @@ impl Playable for Rpssl {
             "🪨" => Self::Rock,
             "📜" => Self::Paper,
             "✂️" => Self::Scissors,
-            "🖖" => Self::Spock,
+            "🧛" => Self::Vampire,
             "🦎" => Self::Lizard,
             "?" => Self::None,
             _ => panic!("Unknown string"),
@@ -626,11 +665,11 @@ mod tests {
         let paper = Rpssl::Paper;
         let scissors = Rpssl::Scissors;
         let lizard = Rpssl::Lizard;
-        let spock = Rpssl::Spock;
+        let vampire = Rpssl::Vampire;
         assert_eq!(rock.result(&rock), RpsResult::Draw);
         assert_eq!(rock.result(&paper), RpsResult::Lose);
         assert_eq!(rock.result(&scissors), RpsResult::Win);
-        assert_eq!(lizard.result(&spock), RpsResult::Win);
+        assert_eq!(lizard.result(&vampire), RpsResult::Win);
         assert_eq!(lizard.result(&paper), RpsResult::Win);
         assert_eq!(rock.result(&lizard), RpsResult::Win);
         assert_eq!(paper.result(&scissors), RpsResult::Lose);

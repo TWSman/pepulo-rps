@@ -95,7 +95,10 @@ pub fn PlayerList(
 }
 
 #[component]
-fn Scores() -> impl IntoView {
+fn Scores(
+    #[prop(into)]
+    game: ReadSignal<Game>,
+) -> impl IntoView {
     let (show_scoring, set_scoring) = create_signal(false);
     view! {
         <div class="nnn" id="scores" on:click=move |_| set_scoring.update(|value| *value = true)>
@@ -104,7 +107,17 @@ fn Scores() -> impl IntoView {
                     X
                 </p>
                 <ul>
-                    <li>"KPS - kaikki vastaan kaikki"</li>
+                {
+                    if game.get().get_mode().str() == "RPS" {
+                        view!{
+                            <li>"KPS - kaikki vastaan kaikki"</li>
+                        }
+                    }else {
+                        view!{
+                            <li>"KPSLV - kaikki vastaan kaikki"</li>
+                        }
+                    }
+                }
                     <li>"Yksi peli kerrallaan"</li>
                     <li>"Kaksinkertainen sarja"</li>
                     <li>
@@ -114,13 +127,30 @@ fn Scores() -> impl IntoView {
                             <li>" Tappio: 0 pistettä"</li>
                         </ul>
                     </li>
-                    <li>
-                        "ja pelatusta kädestä (riippumatta tuloksesta)" <ul>
-                            <li>" Sakset: 3 pistettä"</li>
-                            <li>" Paperi: 2 pistettä"</li>
-                            <li>" Kivi: 1 piste"</li>
-                        </ul>
-                    </li>
+                {if game.get().get_mode().str() == "RPS" {
+                    view!{
+                        <li>
+                            "ja pelatusta kädestä (riippumatta tuloksesta)" <ul>
+                                <li>" Sakset: 3 pistettä"</li>
+                                <li>" Paperi: 2 pistettä"</li>
+                                <li>" Kivi: 1 piste"</li>
+                            </ul>
+                        </li>
+                        }
+                    } else {
+                    view! {
+                        <li>
+                            "ja pelatusta kädestä (riippumatta tuloksesta)" <ul>
+                                <li>" Vampyyri: 5 pistettä"</li>
+                                <li>" Lisko: 4 pistettä"</li>
+                                <li>" Sakset: 3 pistettä"</li>
+                                <li>" Paperi: 2 pistettä"</li>
+                                <li>" Kivi: 1 piste"</li>
+                            </ul>
+                        </li>
+                        }
+                    }
+            }
                     <li>Eniten pisteitä kerännyt on voittaja</li>
                     <li>Tasapisteissä voittajan ratkaisee tavallinen, paras viidestä - kaksinkamppailu</li>
                     <li>"Psyykkinen sodankäynti on sallittua"</li>
@@ -184,7 +214,7 @@ pub fn CurrentMatch(
             view! {
                 <form on:submit=on_submit>
                     // <p>"Round" {round}</p>
-                    <p>
+                    <p id="seuraavana">
                         {player1_name} "   " // <span class="play_select">"🪨"</span>
                         // <span class="play_select">"📜"</span>
                         // <span class="play_select">"✂️"</span>
@@ -198,7 +228,7 @@ pub fn CurrentMatch(
                             <SelectOption value is=Rpssl::Scissors.str()/>
                             { if mode() == GameMode::RPSSL {
                                 view! {
-                                    <SelectOption value is=Rpssl::Spock.str()/>
+                                    <SelectOption value is=Rpssl::Vampire.str()/>
                                     <SelectOption value is=Rpssl::Lizard.str()/>
                                 }.into_view()
                             } else {
@@ -217,7 +247,7 @@ pub fn CurrentMatch(
                             <SelectOption value=value2 is=Rpssl::Scissors.str()/>
                             { if mode() == GameMode::RPSSL {
                                 view! {
-                                    <SelectOption value=value2 is=Rpssl::Spock.str()/>
+                                    <SelectOption value=value2 is=Rpssl::Vampire.str()/>
                                     <SelectOption value=value2 is=Rpssl::Lizard.str()/>
                                 }.into_view()
                             } else {
@@ -352,24 +382,16 @@ set_game: WriteSignal<Game>,
 fn App() -> impl IntoView {
     let (game, set_game) = create_signal(Game::new());
     //set_game.update(|g| {let _ = g.set_mode(GameMode::RPSSL);});
-    set_game.update(|g| g.set_rounds(2));
-    set_game.update(|g| {let _ = g.add_player("Alice");});
-    set_game.update(|g| {let _ = g.add_player("Bob");});
-    set_game.update(|g| {let _ = g.add_player("Charlie");});
-    set_game.update(|g| {let _ = g.add_player("Daniel");});
-    set_game.update(|g| {let _ = g.add_player("Eric");});
-    set_game.update(|g| g.add_result((1,2,1), Rpssl::Rock, Rpssl::Scissors));
-    set_game.update(|g| g.add_result((3,4,1), Rpssl::Rock, Rpssl::Paper));
     let (show_names, set_names) = create_signal(false);
     let (show_games, set_games) = create_signal(false);
     let (show_options, set_options) = create_signal(false);
 
     view! {
         <div class="header" id="header">
-            <h1>"PePuLo KPS-Liiga"</h1>
+            <h1>"Kivi-Paperi-Sakset-Lisko-Vampyyri"</h1>
         </div>
         <div id="container">
-            <Scores/>
+            <Scores game=game/>
             <div class="nnn" id="games" on:click=move |_| set_games.update(|value| *value = true)>
                 <Show when=move || { show_games.get() } fallback=|| view! { <h1>"Pelaamaan"</h1> }>
                     <p class="close" on:click=move |_| set_games.update(|value| *value = false)>
@@ -393,7 +415,7 @@ fn App() -> impl IntoView {
                 </Show>
             </div>
             <div class="nnn" id="options" on:click=move |_| set_options.update(|value| *value = true)>
-                <Show when=move || { show_options.get() } fallback=|| view! { <h1>"Setup"</h1> }>
+                <Show when=move || { show_options.get() } fallback=|| view! { <h1>"Asetukset"</h1> }>
                     <p class="close" on:click=move |_| set_options.update(|value| *value = false)>
                         X
                     </p>
@@ -409,10 +431,36 @@ pub fn Setup(
 game: ReadSignal<Game>,
 set_game: WriteSignal<Game>,
 ) -> impl IntoView {
+    let current_mode = move || match game.get().get_mode().str() {
+        "RPS" => "KPS".to_string(),
+        "RPSSL" => "KPSLV".to_string(),
+        _ => "Unknown".to_string()
+    };
+    let rounds = move || game.get().get_rounds();
+    let debug = move || {
+        set_game.update(|g| g.set_rounds(2));
+        set_game.update(|g| {let _ = g.add_player("Alice");});
+        set_game.update(|g| {let _ = g.add_player("Bob");});
+        set_game.update(|g| {let _ = g.add_player("Charlie");});
+        set_game.update(|g| {let _ = g.add_player("Daniel");});
+        set_game.update(|g| {let _ = g.add_player("Eric");});
+        set_game.update(|g| g.add_result((1,2,1), Rpssl::Rock, Rpssl::Scissors));
+        set_game.update(|g| g.add_result((3,4,1), Rpssl::Rock, Rpssl::Paper));
+    };
     view! {
-        <h2>Setup:</h2>
+        <h2>Asetukset:</h2>
         <button on:click=move |_| set_game.update(|game| { let _ =game.set_mode(GameMode::RPS);})>KPS</button>
-        <button on:click=move |_| set_game.update(|game| { let _ =game.set_mode(GameMode::RPSSL);})>Lizard-Spock</button>
-        <p>"Current mode: " {game.get().get_mode().str().to_string()}</p>
+        <button on:click=move |_| set_game.update(|game| { let _ =game.set_mode(GameMode::RPSSL);})>KPSLV</button>
+        <p>"Peli: " {current_mode}</p>
+        <p>"Kierroksia: " {rounds} " "
+            <button on:click=move |_| set_game.update(|game| { let _ =game.add_rounds();})>+</button>
+            <button on:click=move |_| set_game.update(|game| { let _ =game.remove_rounds();})>-</button>
+            </p>
+        <p>
+            <button on:click=move |_| debug()>Debug</button>
+        </p>
+        <p>
+            <button on:click=move |_| set_game.update(|game| {let _ = game.empty();})>Empty</button>
+        </p>
     }
 }
