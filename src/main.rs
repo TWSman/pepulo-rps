@@ -360,12 +360,12 @@ set_game: WriteSignal<Game>,
                         <tr>
                             //<td>{child.round}</td>
                             //<td>{child.prior}</td>
-                            <td>{child.play1}</td>
+                            <td class="play">{child.play1}</td>
                             <td>{child.score1} "p"</td>
                             <td style="text-align:right;">{child.name1} </td>
                             <td>"Vs."</td>
                             <td>{child.name2}</td>
-                            <td>{child.play2}</td>
+                            <td class="play">{child.play2}</td>
                             <td>{child.score2} "p"</td>
                             
                         </tr>
