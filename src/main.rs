@@ -95,40 +95,104 @@ pub fn PlayerList(
 }
 
 #[component]
-fn Scores(
+fn Scoring(
+    #[prop(into)]
+    game: ReadSignal<Game>,
+) -> impl IntoView {
+    let (show_ordering, set_ordering) = create_signal(false);
+    view! {
+        <div class="nnn" id="ordering" on:click=move |_| set_ordering.update(|value| *value = true)>
+            <Show when=move || { show_ordering.get() } fallback=|| view! { <h1>"Pisteytys"</h1>}>
+                <p class="close" on:click=move |_| set_ordering.update(|value| *value = false)>
+                    X
+                </p>
+
+                {
+                    if game.get().get_mode().str() == "RPS" {
+                    view! {
+                        <h2>"Pisteytys"</h2>
+                        <ul>
+                            <li>" Voitto: 6 pistettä"</li>
+                            <li>" Tasapeli: 3 pistettä"</li>
+                            <li>" Tappio: 0 pistettä"</li>
+                        </ul>
+                        <ul>
+                            <li>" Sakset: 3 pistettä"</li>
+                            <li>" Paperi: 2 pistettä"</li>
+                            <li>" Kivi: 1 piste"</li>
+                        </ul>
+                    }
+                } else {
+                    view! {
+                        <h2>"Pisteytys"</h2>
+                        <ul>
+                            <li>" Voitto: 10 pistettä"</li>
+                            <li>" Tasapeli: 5 pistettä"</li>
+                            <li>" Tappio: 0 pistettä"</li>
+                        </ul>
+                        <ul>
+                            <li>" Vampyyri: 5 pistettä"</li>
+                            <li>" Lisko: 4 pistettä"</li>
+                            <li>" Sakset: 3 pistettä"</li>
+                            <li>" Paperi: 2 pistettä"</li>
+                            <li>" Kivi: 1 piste"</li>
+                        </ul>
+                        <ul>
+                            <li>"Scissors cuts Paper"</li>
+                            <li>"Paper covers Rock"</li>
+                            <li>"Rock crushes Lizard"</li>
+                            <li>"Lizard poisons " <s>"Spock"</s> " Vampire"</li>
+                            <li>"Vampire smashes Scissors"</li>
+                            <li>"Scissors decapitates Lizard"</li>
+                            <li>"Lizard eats Paper"</li>
+                            <li>"Paper disproves " <s>"Spock"</s>" Vampire"</li>
+                            <li>"Vampire vaporizes Rock"</li>
+                            <li>"Rock crushes Scissors"</li>
+                        </ul>
+                    }
+                }
+            }
+            </Show>
+        </div>
+    }
+}
+
+#[component]
+fn Rules(
     #[prop(into)]
     game: ReadSignal<Game>,
 ) -> impl IntoView {
     let (show_scoring, set_scoring) = create_signal(false);
     view! {
-        <div class="nnn" id="scores" on:click=move |_| set_scoring.update(|value| *value = true)>
+        <div class="nnn" id="rules" on:click=move |_| set_scoring.update(|value| *value = true)>
             <Show when=move || { show_scoring.get() } fallback=|| view! { <h1>"Säännöt"</h1>}>
                 <p class="close" on:click=move |_| set_scoring.update(|value| *value = false)>
                     X
                 </p>
+                <h2>"Säännöt"</h2>
                 <ul>
                 {
                     if game.get().get_mode().str() == "RPS" {
                         view!{
-                            <li>"KPS - kaikki vastaan kaikki"</li>
+                            <li>"KPS - kaikki vastaan sarja"</li>
                         }
                     }else {
                         view!{
-                            <li>"KPSLV - kaikki vastaan kaikki"</li>
+                            <li>"Kaikki vastaan kaikki sarja"</li>
                         }
                     }
                 }
                     <li>"Yksi peli kerrallaan"</li>
-                    <li>"Kaksinkertainen sarja"</li>
-                    <li>
-                        "Pisteitä saa tuloksesta" <ul>
-                            <li>" Voitto: 6 pistettä"</li>
-                            <li>" Tasapeli: 3 pistettä"</li>
-                            <li>" Tappio: 0 pistettä"</li>
-                        </ul>
-                    </li>
+                    <li>"n-kertainen sarja"</li>
                 {if game.get().get_mode().str() == "RPS" {
                     view!{
+                        <li>
+                            "Pisteitä saa tuloksesta" <ul>
+                                <li>" Voitto: 6 pistettä"</li>
+                                <li>" Tasapeli: 3 pistettä"</li>
+                                <li>" Tappio: 0 pistettä"</li>
+                            </ul>
+                        </li>
                         <li>
                             "ja pelatusta kädestä (riippumatta tuloksesta)" <ul>
                                 <li>" Sakset: 3 pistettä"</li>
@@ -139,6 +203,13 @@ fn Scores(
                         }
                     } else {
                     view! {
+                        <li>
+                            "Pisteitä saa tuloksesta" <ul>
+                                <li>" Voitto: 10 pistettä"</li>
+                                <li>" Tasapeli: 5 pistettä"</li>
+                                <li>" Tappio: 0 pistettä"</li>
+                            </ul>
+                        </li>
                         <li>
                             "ja pelatusta kädestä (riippumatta tuloksesta)" <ul>
                                 <li>" Vampyyri: 5 pistettä"</li>
@@ -152,8 +223,8 @@ fn Scores(
                     }
             }
                     <li>Eniten pisteitä kerännyt on voittaja</li>
-                    <li>Tasapisteissä voittajan ratkaisee tavallinen, paras viidestä - kaksinkamppailu</li>
-                    <li>"Psyykkinen sodankäynti on sallittua"</li>
+                    <li>Tasapisteissä voittajan ratkaisee paras viidestä - kaksinkamppailu</li>
+                    //<li>"Psyykkinen sodankäynti on sallittua"</li>
                 </ul>
             </Show>
         </div>
@@ -313,7 +384,7 @@ set_game: WriteSignal<Game>,
             let id2 = m.player2;
             let player1 = game.get().get_player_name(id1).unwrap();
             let player2 = game.get().get_player_name(id2).unwrap();
-            let (score1, score2) = m.get_score();
+            let (score1, score2) = m.get_score(game.get().get_mode());
             let play1 = m.play1.str().to_string();
             let play2 = m.play2.str().to_string();
 
@@ -381,7 +452,7 @@ set_game: WriteSignal<Game>,
 #[component]
 fn App() -> impl IntoView {
     let (game, set_game) = create_signal(Game::new());
-    //set_game.update(|g| {let _ = g.set_mode(GameMode::RPSSL);});
+    set_game.update(|g| {let _ = g.set_mode(GameMode::RPSSL);});
     let (show_names, set_names) = create_signal(false);
     let (show_games, set_games) = create_signal(false);
     let (show_options, set_options) = create_signal(false);
@@ -391,7 +462,7 @@ fn App() -> impl IntoView {
             <h1>"Kivi-Paperi-Sakset-Lisko-Vampyyri"</h1>
         </div>
         <div id="container">
-            <Scores game=game/>
+            <Scoring game=game/>
             <div class="nnn" id="games" on:click=move |_| set_games.update(|value| *value = true)>
                 <Show when=move || { show_games.get() } fallback=|| view! { <h1>"Pelaamaan"</h1> }>
                     <p class="close" on:click=move |_| set_games.update(|value| *value = false)>
@@ -414,6 +485,7 @@ fn App() -> impl IntoView {
 
                 </Show>
             </div>
+            <Rules game=game/>
             <div class="nnn" id="options" on:click=move |_| set_options.update(|value| *value = true)>
                 <Show when=move || { show_options.get() } fallback=|| view! { <h1>"Asetukset"</h1> }>
                     <p class="close" on:click=move |_| set_options.update(|value| *value = false)>

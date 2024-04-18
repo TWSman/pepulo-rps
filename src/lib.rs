@@ -44,7 +44,10 @@ fn get_quote(i: usize) -> (String, String) {
     (q.0.to_string(), q.1.to_string())
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+//static WINSCORE: u16 = 10;
+//static DRAWSCORE: u16 = 5;
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum GameMode {
     RPS,
     RPSSL,
@@ -123,7 +126,7 @@ impl Game {
             ((p1 == &pid) | (p2 == &pid)) & (m.result.is_some())
         }).collect::<Vec<_>>();
         (matches.len() as u16, 
-            matches.iter().map(|(_,m)| m.get_score_for_player(pid)).sum()
+            matches.iter().map(|(_,m)| m.get_score_for_player(pid, self.game_mode)).sum()
         )
     }
 
@@ -288,9 +291,13 @@ impl Game {
         let player1 = self.player_list.get_mut(&m.player1).unwrap();
         let name1 = player1.name.clone();
         let result = play1.result(&play2);
-        let score = result.get_score();
+        let score = result.get_score(self.game_mode);
+        let winscore = match self.game_mode {
+            GameMode::RPSSL => 10,
+            GameMode::RPS => 6,
+        };
         let player1_score = play1.get_score() + score;
-        let player2_score = play2.get_score() + (6 - score);
+        let player2_score = play2.get_score() + (winscore - score);
 
         player1.played += 1;
         player1.score += player1_score;
@@ -377,8 +384,8 @@ impl Game {
             let games_left1 = n_games - player1.played;
             let games_left2 = n_games - player2.played;
             debug!("\tGames left = {} / {}", &games_left1, &games_left2);
-            let potential1 = (games_left1 * 9) as i64;
-            let potential2 = (games_left2 * 9) as i64;
+            let potential1 = (games_left1 * 15) as i64;
+            let potential2 = (games_left2 * 15) as i64;
             debug!("\tPotential = {} / {}", &potential1, &potential2);
             let score1 = player1.score as i64;
             let score2 = player2.score as i64;
@@ -413,24 +420,28 @@ impl Match {
         }
     }
 
-    pub fn get_score(&self) -> (u16, u16) {
+    pub fn get_score(&self, game_mode: GameMode) -> (u16, u16) {
         if self.result.is_none() {
             return (0,0);
         }
-        let score = self.result.as_ref().unwrap().get_score();
+        let winscore = match game_mode {
+            GameMode::RPSSL => 10,
+            GameMode::RPS => 6,
+        };
+        let score = self.result.as_ref().unwrap().get_score(game_mode);
         let player1_score = self.play1.get_score() + score;
-        let player2_score = self.play2.get_score() + (6 - score);
+        let player2_score = self.play2.get_score() + (winscore - score);
         (player1_score, player2_score)
     }
 
-    fn get_score_for_player(&self, pid: u16) -> u16 {
+    fn get_score_for_player(&self, pid: u16, game_mode: GameMode) -> u16 {
         if self.result.is_none() {
             return 0;
         }
         if (pid != self.player1) & (pid != self.player2) {
             0
         } else {
-            let (p1_score, p2_score) = self.get_score();
+            let (p1_score, p2_score) = self.get_score(game_mode);
             if pid == self.player1 {
                 p1_score
             } else {
@@ -491,10 +502,15 @@ pub enum RpsResult {
 
 #[allow(dead_code)]
 impl RpsResult {
-    fn get_score(&self) -> u16 {
+    fn get_score(&self, game_mode: GameMode) -> u16 {
+
+        let winscore = match game_mode {
+            GameMode::RPS => 6,
+            GameMode::RPSSL => 10,
+        };
         match self {
-            RpsResult::Win => 6,
-            RpsResult::Draw => 3,
+            RpsResult::Win => winscore, 
+            RpsResult::Draw => winscore / 2,
             RpsResult::Lose => 0,
         }
     }
